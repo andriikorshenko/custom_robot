@@ -49,3 +49,6 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# Hide the universal_robot directory inside src
+src/universal_robot/
