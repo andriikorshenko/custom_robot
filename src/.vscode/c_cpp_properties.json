@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/opt/ros/noetic/include/**",
+        "/home/cookie/master_ws/src/custom_robot_description/include/**",
+        "/home/cookie/master_ws/src/custom_robot_worlds/include/**",
+        "/home/cookie/catkin_ws/src/ur3e_kinematics/include/**",
+        "/home/cookie/catkin_ws/src/ur/ur_kinematics/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
