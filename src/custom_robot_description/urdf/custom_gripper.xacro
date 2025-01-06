@@ -26,7 +26,7 @@
             <child link="finger_support"/>
             <origin xyz="0 0 0.03" rpy="0 0 0"/>
         </joint>
-        <!-- finger_right & finger_left -->
+        <!-- finger_right and finger_left -->
         <xacro:cobot_link_box name="finger_right" 
             origin_xyz="0 0 0.04" 
             origin_rpy="0 0 0" 
