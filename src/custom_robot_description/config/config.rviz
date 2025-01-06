@@ -14,6 +14,7 @@ Panels:
         - /RobotModel1/Links1/link31
         - /RobotModel1/Links1/link41
         - /RobotModel1/Links1/link51
+        - /RobotModel1/Links1/link61
         - /TF1
       Splitter Ratio: 0.5
     Tree Height: 719
@@ -75,6 +76,11 @@ Visualization Manager:
           Show Axes: true
           Show Trail: false
           Value: true
+        gripper_connector:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         link1:
           Alpha: 0.5
           Show Axes: true
@@ -101,10 +107,14 @@ Visualization Manager:
           Show Trail: false
           Value: true
         link6:
-          Alpha: 1
+          Alpha: 0.5
           Show Axes: false
           Show Trail: false
           Value: true
+        tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -120,6 +130,8 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
+        gripper_connector:
+          Value: true
         link1:
           Value: true
         link2:
@@ -131,6 +143,8 @@ Visualization Manager:
         link5:
           Value: true
         link6:
+          Value: true
+        tool0:
           Value: true
       Marker Alpha: 1
       Marker Scale: 0.5
@@ -146,7 +160,9 @@ Visualization Manager:
                 link4:
                   link5:
                     link6:
-                      {}
+                      tool0:
+                        gripper_connector:
+                          {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -177,7 +193,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.9980266094207764
+      Distance: 0.8165446519851685
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -193,9 +209,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4247959852218628
+      Pitch: 0.15979595482349396
       Target Frame: <Fixed Frame>
-      Yaw: 5.945395469665527
+      Yaw: 6.08039665222168
     Saved: ~
 Window Geometry:
   Displays:
