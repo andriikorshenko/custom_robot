@@ -1,6 +1,7 @@
 <?xml version = "1.0"?>
 <robot name="custom_robot" xmlns:xacro="http://www.ros.org.wiki.xacro">
     <xacro:include filename="$(find custom_robot_description)/urdf/link_joint.xacro"/>
+    <xacro:include filename="$(find custom_robot_description)/urdf/custom_gripper.xacro"/>
     <!-- base_link -->
     <xacro:cobot_link_cylinder name="base_link" 
         origin_xyz="0 0 0.02" 
@@ -142,7 +143,7 @@
     <xacro:cobot_link_cylinder name="link4" 
         origin_xyz="0 0 0.047" 
         origin_rpy="0 0 0" 
-        radius="0.0325" 
+        radius="0.035" 
         length="0.094"/>
     <!-- <link name="link4">
         <visual>
@@ -263,4 +264,5 @@
         <child link="tool0"/>
         <origin xyz="0 0 0.02" rpy="0 0 0"/>        
     </joint>
+    <xacro:custom_gripper parent="tool0" origin_xyz="0 0 0"/>
 </robot>
