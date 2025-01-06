@@ -14,6 +14,8 @@ Panels:
         - /RobotModel1/Links1/link31
         - /RobotModel1/Links1/link41
         - /RobotModel1/Links1/link51
+        - /RobotModel1/Links1/link61
+        - /RobotModel1/Links1/tool01
         - /TF1
       Splitter Ratio: 0.5
     Tree Height: 719
@@ -75,6 +77,11 @@ Visualization Manager:
           Show Axes: true
           Show Trail: false
           Value: true
+        gripper_connector:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
         link1:
           Alpha: 0.5
           Show Axes: true
@@ -101,10 +108,14 @@ Visualization Manager:
           Show Trail: false
           Value: true
         link6:
-          Alpha: 1
+          Alpha: 0.5
           Show Axes: false
           Show Trail: false
           Value: true
+        tool0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -120,6 +131,8 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
+        gripper_connector:
+          Value: true
         link1:
           Value: true
         link2:
@@ -131,6 +144,8 @@ Visualization Manager:
         link5:
           Value: true
         link6:
+          Value: true
+        tool0:
           Value: true
       Marker Alpha: 1
       Marker Scale: 0.5
@@ -146,7 +161,9 @@ Visualization Manager:
                 link4:
                   link5:
                     link6:
-                      {}
+                      tool0:
+                        gripper_connector:
+                          {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -177,7 +194,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.9980266094207764
+      Distance: 2.1719608306884766
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -185,17 +202,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.10123923420906067
-        Y: -0.11629610508680344
-        Z: 1.0083153247833252
+        X: -0.03213617205619812
+        Y: 0.009220538660883904
+        Z: 0.7999296188354492
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4247959852218628
+      Pitch: 0.23479562997817993
       Target Frame: <Fixed Frame>
-      Yaw: 5.945395469665527
+      Yaw: 0.11220202594995499
     Saved: ~
 Window Geometry:
   Displays:

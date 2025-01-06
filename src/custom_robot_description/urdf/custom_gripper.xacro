@@ -1,0 +1,18 @@
+<?xml version = "1.0"?>
+<robot xmlns:xacro="http://www.ros.org.wiki.xacro">
+    <xacro:include filename="$(find custom_robot_description)/urdf/link_joint.xacro"/>
+    <!-- Modeling the gripper -->
+    <xacro:macro name="custom_gripper" params="parent origin_xyz">
+        <xacro:cobot_link_cylinder name="gripper_connector" 
+            origin_xyz="0 0 0.015" 
+            origin_rpy="0 0 0" 
+            radius="0.04" 
+            length="0.03"/>
+        <joint name="{parent}__gripper_connector" 
+            type="fixed">
+            <parent link="${parent}"/>
+            <child link="gripper_connector"/>
+            <origin xyz="${origin_xyz}" rpy="0 0 0"/>
+        </joint>
+    </xacro:macro>
+</robot>
