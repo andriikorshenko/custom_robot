@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  moveit_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -174,6 +175,10 @@ target_link_libraries(move_test ${catkin_LIBRARIES})
 add_executable(repeatable_trajectory src/repeatable_trajectory.cpp)
 add_dependencies(repeatable_trajectory ${cobot_test_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(repeatable_trajectory ${catkin_LIBRARIES})
+
+add_executable(ompl src/ompl.cpp)
+add_dependencies(ompl ${cobot_test_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(ompl ${catkin_LIBRARIES})
 
 #############
 ## Install ##
