@@ -19,8 +19,8 @@ int main(int argc, char** argv)
   moveit::planning_interface::MoveGroupInterface move_group(PLANNING_GROUP);
 
   // Set velocity and acceleration scaling factors to maximum (1.0)
-  move_group.setMaxVelocityScalingFactor(1.0);
-  move_group.setMaxAccelerationScalingFactor(1.0);
+  move_group.setMaxVelocityScalingFactor(0.5);
+  move_group.setMaxAccelerationScalingFactor(0.5);
 
   // Set basic parameters
   move_group.setPoseReferenceFrame("base_link");
