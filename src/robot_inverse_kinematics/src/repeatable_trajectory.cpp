@@ -29,6 +29,27 @@ int main(int argc, char **argv)
     // Setup the target position
     group.setPoseReferenceFrame("base_link");
 
+    // Add a collision object for the table
+    moveit_msgs::CollisionObject table;
+    table.id = "table";
+    table.header.frame_id = "base_link";
+
+    shape_msgs::SolidPrimitive primitive;
+    primitive.type = shape_msgs::SolidPrimitive::BOX;
+    primitive.dimensions = {1.0, 1.0, 0.2}; // Length, width, height of the table
+
+    geometry_msgs::Pose table_pose;
+    table_pose.position.x = 0.0;
+    table_pose.position.y = 0.0;
+    table_pose.position.z = -0.2; // Table's top is 20 cm below the robot's base
+    table_pose.orientation.w = 1.0;
+
+    table.primitives.push_back(primitive);
+    table.primitive_poses.push_back(table_pose);
+    table.operation = table.ADD;
+
+    planning_scene_interface.applyCollisionObject(table);
+
     // Move the robot to the "up" position
     ROS_INFO("Moving to 'up' position...");
     group.setNamedTarget("up");
@@ -41,12 +62,16 @@ int main(int argc, char **argv)
     target_pose1.orientation = tf2::toMsg(orientation);
     target_pose1.position.x = 0.0;
     target_pose1.position.y = 0.4;
-    target_pose1.position.z = 0.181;
+    target_pose1.position.z = 0.4; // Increased height above the table
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.376;
-    target_pose2.position.y = -0.243;
-    target_pose2.position.z = 0.356;
+    target_pose2.position.x = -0.369;
+    target_pose2.position.y = -0.234;
+    target_pose2.position.z = 0.086; // Increased height above the table
+
+    // Set planning parameters
+    group.setPlanningTime(10.0);
+    group.setNumPlanningAttempts(5);
 
     // Ping-pong loop between the two target poses
     bool toggle = true;
@@ -54,6 +79,12 @@ int main(int argc, char **argv)
     {
         // Update current state before planning
         moveit::core::RobotStatePtr current_state = group.getCurrentState();
+        if (!current_state->satisfiesBounds())
+        {
+            ROS_ERROR("Robot state is out of bounds! Skipping this loop iteration.");
+            continue;
+        }
+
         group.setStartState(*current_state);
 
         ROS_INFO("Planning to the next target position...");
