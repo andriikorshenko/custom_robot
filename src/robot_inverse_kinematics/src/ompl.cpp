@@ -10,7 +10,7 @@ const double tau = 2 * M_PI;
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "ompl_planner_with_obstacles");
+    ros::init(argc, argv, "ompl_planner_with_orientation_constraint");
     ros::NodeHandle nh;
 
     if (!ros::master::check()) {
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
     // Define target poses
     geometry_msgs::Pose target_pose1, target_pose2;
     tf2::Quaternion orientation;
-    orientation.setRPY(-tau / 2, 0, 0); // Specific rotation
+    orientation.setRPY(-tau / 2, 0, 0); // Keep EEF orientation straight
     target_pose1.orientation = tf2::toMsg(orientation);
     target_pose1.position.x = 0.272;
     target_pose1.position.y = 0.004;
@@ -145,6 +145,20 @@ int main(int argc, char **argv)
     target_pose2.position.x = -0.234;
     target_pose2.position.y = 0.155;
     target_pose2.position.z = 0.033;
+
+    // Add an orientation constraint to keep the EEF straight
+    moveit_msgs::OrientationConstraint ocm;
+    ocm.link_name = group.getEndEffectorLink();
+    ocm.header.frame_id = "base_link";
+    ocm.orientation = target_pose1.orientation; // Desired orientation
+    ocm.absolute_x_axis_tolerance = 0.01;      // Tight tolerances
+    ocm.absolute_y_axis_tolerance = 0.01;
+    ocm.absolute_z_axis_tolerance = 0.01;
+    ocm.weight = 1.0;
+
+    moveit_msgs::Constraints path_constraints;
+    path_constraints.orientation_constraints.push_back(ocm);
+    group.setPathConstraints(path_constraints);
 
     // Planning and execution loop
     bool toggle = true;
@@ -188,3 +202,4 @@ int main(int argc, char **argv)
     ros::shutdown();
     return 0;
 }
+
