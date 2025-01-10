@@ -10,8 +10,14 @@ const double tau = 2 * M_PI;
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "ompl_planner_straight_eef");
+    ros::init(argc, argv, "ompl_planner_with_obstacles");
     ros::NodeHandle nh;
+
+    if (!ros::master::check()) {
+        ROS_ERROR("ROS Master is not running. Exiting...");
+        return -1;
+    }
+
     ros::AsyncSpinner spinner(1);
     spinner.start();
     sleep(2.0);
@@ -19,8 +25,8 @@ int main(int argc, char **argv)
     // Initialize MoveIt
     moveit::planning_interface::MoveGroupInterface group("manipulator");
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
-    group.setMaxVelocityScalingFactor(0.5); // Smooth motion
-    group.setMaxAccelerationScalingFactor(0.5);
+    group.setMaxVelocityScalingFactor(1);
+    group.setMaxAccelerationScalingFactor(1);
 
     ros::Publisher display_publisher = nh.advertise<moveit_msgs::DisplayTrajectory>("/move_group/display_planned_path", 1, true);
     moveit_msgs::DisplayTrajectory display_trajectory;
@@ -31,12 +37,14 @@ int main(int argc, char **argv)
     planning_scene_monitor::PlanningSceneMonitor psm("robot_description");
     psm.requestPlanningSceneState();
 
-    // Add a box under the robot to the planning scene
+    // Define collision objects: cube and walls
+    std::vector<moveit_msgs::CollisionObject> collision_objects;
+
+    // Add the box under the robot
     moveit_msgs::CollisionObject box;
     box.header.frame_id = "base_link";
     box.id = "box";
 
-    // Define the box dimensions
     shape_msgs::SolidPrimitive box_primitive;
     box_primitive.type = shape_msgs::SolidPrimitive::BOX;
     box_primitive.dimensions.resize(3);
@@ -44,40 +52,84 @@ int main(int argc, char **argv)
     box_primitive.dimensions[1] = 0.5; // Width (Y)
     box_primitive.dimensions[2] = 0.1; // Height (Z)
 
-    // Define the box pose
     geometry_msgs::Pose box_pose;
     box_pose.orientation.w = 1.0;
     box_pose.position.x = 0.0;
     box_pose.position.y = 0.0;
-    box_pose.position.z = -0.05; // Slightly below the robot's base_link
+    box_pose.position.z = -0.05;
 
     box.primitives.push_back(box_primitive);
     box.primitive_poses.push_back(box_pose);
     box.operation = box.ADD;
-
-    // Add the box to the planning scene
-    std::vector<moveit_msgs::CollisionObject> collision_objects;
     collision_objects.push_back(box);
+
+    // Add the front wall
+    moveit_msgs::CollisionObject front_wall;
+    front_wall.header.frame_id = "base_link";
+    front_wall.id = "front_wall";
+
+    shape_msgs::SolidPrimitive front_wall_primitive;
+    front_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
+    front_wall_primitive.dimensions.resize(3);
+    front_wall_primitive.dimensions[0] = 0.5; // Width (X)
+    front_wall_primitive.dimensions[1] = 0.02; // Thickness (Y)
+    front_wall_primitive.dimensions[2] = 0.5; // Height (Z)
+
+    geometry_msgs::Pose front_wall_pose;
+    front_wall_pose.orientation.w = 1.0;
+    front_wall_pose.position.x = 0.0;
+    front_wall_pose.position.y = 0.3; // Positioned 30 cm in front of the cube
+    front_wall_pose.position.z = 0.25;
+
+    front_wall.primitives.push_back(front_wall_primitive);
+    front_wall.primitive_poses.push_back(front_wall_pose);
+    front_wall.operation = front_wall.ADD;
+    collision_objects.push_back(front_wall);
+
+    // Add the back wall
+    moveit_msgs::CollisionObject back_wall;
+    back_wall.header.frame_id = "base_link";
+    back_wall.id = "back_wall";
+
+    shape_msgs::SolidPrimitive back_wall_primitive;
+    back_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
+    back_wall_primitive.dimensions.resize(3);
+    back_wall_primitive.dimensions[0] = 0.5; // Width (X)
+    back_wall_primitive.dimensions[1] = 0.02; // Thickness (Y)
+    back_wall_primitive.dimensions[2] = 0.5; // Height (Z)
+
+    geometry_msgs::Pose back_wall_pose;
+    back_wall_pose.orientation.w = 1.0;
+    back_wall_pose.position.x = 0.0;
+    back_wall_pose.position.y = -0.3; // Positioned 30 cm behind the cube
+    back_wall_pose.position.z = 0.25;
+
+    back_wall.primitives.push_back(back_wall_primitive);
+    back_wall.primitive_poses.push_back(back_wall_pose);
+    back_wall.operation = back_wall.ADD;
+    collision_objects.push_back(back_wall);
+
+    // Add all collision objects to the planning scene
     planning_scene_interface.addCollisionObjects(collision_objects);
 
-    ROS_INFO("Added a box under the robot. Waiting for updates in the planning scene...");
+    ROS_INFO("Added the cube and two walls. Waiting for updates in the planning scene...");
 
-    // Wait for the box to appear in the planning scene
-    bool object_added = false;
+    // Wait for objects to appear in the planning scene
+    bool objects_added = false;
     for (int i = 0; i < 10; ++i) {
         auto updated_objects = planning_scene_interface.getKnownObjectNames();
-        if (std::find(updated_objects.begin(), updated_objects.end(), "box") != updated_objects.end()) {
-            ROS_INFO("Box successfully added to the planning scene.");
-            object_added = true;
+        if (std::find(updated_objects.begin(), updated_objects.end(), "box") != updated_objects.end() &&
+            std::find(updated_objects.begin(), updated_objects.end(), "front_wall") != updated_objects.end() &&
+            std::find(updated_objects.begin(), updated_objects.end(), "back_wall") != updated_objects.end()) {
+            ROS_INFO("Cube and walls successfully added to the planning scene.");
+            objects_added = true;
             break;
         }
         ros::Duration(0.5).sleep(); // Retry every 0.5 seconds
     }
 
-    if (!object_added) {
-        ROS_ERROR("Failed to add the box to the planning scene after multiple attempts.");
-        ros::shutdown();
-        return -1;
+    if (!objects_added) {
+        ROS_WARN("Failed to add all obstacles to the planning scene. Proceeding anyway...");
     }
 
     // Define target poses
@@ -85,31 +137,18 @@ int main(int argc, char **argv)
     tf2::Quaternion orientation;
     orientation.setRPY(-tau / 2, 0, 0); // Specific rotation
     target_pose1.orientation = tf2::toMsg(orientation);
-    target_pose1.position.x = 0.0;
-    target_pose1.position.y = 0.4;
-    target_pose1.position.z = 0.4;
+    target_pose1.position.x = 0.272;
+    target_pose1.position.y = 0.004;
+    target_pose1.position.z = 0.110;
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.369;
-    target_pose2.position.y = -0.234;
-    target_pose2.position.z = 0.140;
-
-    // Add an orientation constraint to keep the EEF straight
-    moveit_msgs::OrientationConstraint ocm;
-    ocm.link_name = group.getEndEffectorLink();
-    ocm.header.frame_id = "base_link";
-    ocm.orientation = target_pose1.orientation; // Desired orientation
-    ocm.absolute_x_axis_tolerance = 0.05;      // Tighter tolerances
-    ocm.absolute_y_axis_tolerance = 0.05;
-    ocm.absolute_z_axis_tolerance = 0.05;
-    ocm.weight = 1.0;
-
-    moveit_msgs::Constraints path_constraints;
-    path_constraints.orientation_constraints.push_back(ocm);
-    group.setPathConstraints(path_constraints);
+    target_pose2.position.x = -0.234;
+    target_pose2.position.y = 0.155;
+    target_pose2.position.z = 0.033;
 
     // Planning and execution loop
     bool toggle = true;
+    ROS_INFO("Starting planning and execution loop...");
     while (ros::ok())
     {
         // Set the start state
@@ -120,7 +159,7 @@ int main(int argc, char **argv)
         geometry_msgs::Pose target_pose = toggle ? target_pose1 : target_pose2;
         group.setPoseTarget(target_pose);
 
-        // Plan the trajectory using OMPL
+        // Plan the trajectory
         moveit::planning_interface::MoveGroupInterface::Plan global_plan;
         moveit::planning_interface::MoveItErrorCode success = group.plan(global_plan);
 
@@ -140,10 +179,10 @@ int main(int argc, char **argv)
 
         // Toggle target pose
         toggle = !toggle;
-        ros::Duration(2.0).sleep(); // Pause for visibility
+        ros::Duration(2.0).sleep();
     }
 
-    // Clean up path constraints when done
+    // Clean up path constraints
     group.clearPathConstraints();
 
     ros::shutdown();
