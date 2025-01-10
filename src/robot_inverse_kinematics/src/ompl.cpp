@@ -2,6 +2,7 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/DisplayTrajectory.h>
 #include <moveit_msgs/OrientationConstraint.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <geometric_shapes/shape_operations.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
@@ -25,6 +26,10 @@ int main(int argc, char **argv)
     moveit_msgs::DisplayTrajectory display_trajectory;
 
     group.setPoseReferenceFrame("base_link");
+
+    // Monitor the planning scene
+    planning_scene_monitor::PlanningSceneMonitor psm("robot_description");
+    psm.requestPlanningSceneState();
 
     // Add a box under the robot to the planning scene
     moveit_msgs::CollisionObject box;
@@ -55,7 +60,25 @@ int main(int argc, char **argv)
     collision_objects.push_back(box);
     planning_scene_interface.addCollisionObjects(collision_objects);
 
-    ROS_INFO("Added a box under the robot.");
+    ROS_INFO("Added a box under the robot. Waiting for updates in the planning scene...");
+
+    // Wait for the box to appear in the planning scene
+    bool object_added = false;
+    for (int i = 0; i < 10; ++i) {
+        auto updated_objects = planning_scene_interface.getKnownObjectNames();
+        if (std::find(updated_objects.begin(), updated_objects.end(), "box") != updated_objects.end()) {
+            ROS_INFO("Box successfully added to the planning scene.");
+            object_added = true;
+            break;
+        }
+        ros::Duration(0.5).sleep(); // Retry every 0.5 seconds
+    }
+
+    if (!object_added) {
+        ROS_ERROR("Failed to add the box to the planning scene after multiple attempts.");
+        ros::shutdown();
+        return -1;
+    }
 
     // Define target poses
     geometry_msgs::Pose target_pose1, target_pose2;
