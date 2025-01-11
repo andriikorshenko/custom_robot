@@ -225,7 +225,7 @@ int main(int argc, char **argv)
     nh.setParam("/ompl_planner_configs/" + planner_id + "/interpolation_steps", 15);
 
     // Set initial planning time
-    double planning_time = 5.0; // Start with 5 seconds
+    double planning_time = 1.0; 
     group.setPlanningTime(planning_time);
 
     // Initialize publisher for trajectory visualization
