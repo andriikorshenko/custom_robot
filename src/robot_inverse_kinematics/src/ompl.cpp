@@ -11,7 +11,7 @@ const double tau = 2 * M_PI;
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "ompl_planner_with_max_threads");
+    ros::init(argc, argv, "ompl_planner_with_optimizations");
     ros::NodeHandle nh;
 
     if (!ros::master::check()) {
@@ -20,18 +20,12 @@ int main(int argc, char **argv)
     }
 
     // Dynamically determine the maximum number of threads
-    unsigned int num_threads = std::thread::hardware_concurrency();
-    if (num_threads == 0) { // Fallback in case hardware_concurrency() fails
-        ROS_WARN("Unable to determine hardware concurrency. Defaulting to 4 threads.");
-        num_threads = 4;
-    }
-
+    unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency() - 1); // Leave 1 core for OS tasks
     ROS_INFO("Using %u threads for AsyncSpinner.", num_threads);
 
-    // Enable multi-threading with the maximum number of threads
-    ros::AsyncSpinner spinner(num_threads);
+    ros::AsyncSpinner spinner(num_threads); // Enable multi-threading
     spinner.start();
-    ros::Duration(2.0).sleep();
+    ros::Duration(1.0).sleep();
 
     // Initialize MoveIt
     moveit::planning_interface::MoveGroupInterface group("manipulator");
@@ -41,12 +35,18 @@ int main(int argc, char **argv)
     group.setMaxVelocityScalingFactor(1.0); // Maximum velocity
     group.setMaxAccelerationScalingFactor(1.0); // Maximum acceleration
 
-    // Use a faster planner
+    // Use RRTConnect planner
     group.setPlannerId("RRTConnectkConfigDefault");
 
-    // Increase planning time for better success rates
-    group.setPlanningTime(10.0);
+    // Dynamically set planner parameters
+    nh.setParam("/ompl_planner_configs/RRTConnectkConfigDefault/range", 0.5); // Increase step size
+    nh.setParam("/ompl_planner_configs/RRTConnectkConfigDefault/goal_bias", 0.1); // Favor the goal
+    nh.setParam("/ompl_planner_configs/RRTConnectkConfigDefault/threads", static_cast<int>(num_threads)); // Cast to int
 
+    // Set planning time
+    group.setPlanningTime(5.0);
+
+    // Initialize publisher for trajectory visualization
     ros::Publisher display_publisher = nh.advertise<moveit_msgs::DisplayTrajectory>("/move_group/display_planned_path", 1, true);
     moveit_msgs::DisplayTrajectory display_trajectory;
 
@@ -54,19 +54,21 @@ int main(int argc, char **argv)
 
     // Monitor the planning scene
     planning_scene_monitor::PlanningSceneMonitor psm("robot_description");
-    psm.requestPlanningSceneState();
+    if (!psm.requestPlanningSceneState()) {
+        ROS_WARN("Failed to request the planning scene state. Proceeding anyway.");
+    }
 
     // Define collision objects
     std::vector<moveit_msgs::CollisionObject> collision_objects;
 
-    // Define the box under the robot
+    // Add the box under the robot
     moveit_msgs::CollisionObject box;
     box.header.frame_id = "base_link";
     box.id = "box";
 
     shape_msgs::SolidPrimitive box_primitive;
     box_primitive.type = shape_msgs::SolidPrimitive::BOX;
-    box_primitive.dimensions = {0.5, 0.5, 0.1}; // Dimensions: Length, Width, Height
+    box_primitive.dimensions = {0.5, 0.5, 0.1};
 
     geometry_msgs::Pose box_pose;
     box_pose.orientation.w = 1.0;
@@ -79,14 +81,15 @@ int main(int argc, char **argv)
     box.operation = box.ADD;
     collision_objects.push_back(box);
 
-    // Add the front wall
+    // Add other collision objects (walls)
+    // Front wall
     moveit_msgs::CollisionObject front_wall;
     front_wall.header.frame_id = "base_link";
     front_wall.id = "front_wall";
 
     shape_msgs::SolidPrimitive front_wall_primitive;
     front_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
-    front_wall_primitive.dimensions = {0.5, 0.02, 0.5}; // Dimensions: Width, Thickness, Height
+    front_wall_primitive.dimensions = {0.5, 0.02, 0.5};
 
     geometry_msgs::Pose front_wall_pose;
     front_wall_pose.orientation.w = 1.0;
@@ -99,14 +102,14 @@ int main(int argc, char **argv)
     front_wall.operation = front_wall.ADD;
     collision_objects.push_back(front_wall);
 
-    // Add the back wall
+    // Back wall
     moveit_msgs::CollisionObject back_wall;
     back_wall.header.frame_id = "base_link";
     back_wall.id = "back_wall";
 
     shape_msgs::SolidPrimitive back_wall_primitive;
     back_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
-    back_wall_primitive.dimensions = {0.5, 0.02, 0.5}; // Dimensions: Width, Thickness, Height
+    back_wall_primitive.dimensions = {0.5, 0.02, 0.5};
 
     geometry_msgs::Pose back_wall_pose;
     back_wall_pose.orientation.w = 1.0;
@@ -119,11 +122,17 @@ int main(int argc, char **argv)
     back_wall.operation = back_wall.ADD;
     collision_objects.push_back(back_wall);
 
-    // Add all collision objects to the planning scene
     planning_scene_interface.addCollisionObjects(collision_objects);
-
-    ROS_INFO("Collision objects added. Waiting for the planning scene to update...");
+    ROS_INFO("Added collision objects. Waiting for the planning scene to update...");
     ros::Duration(1.0).sleep();
+
+    // Verify collision objects
+    auto known_objects = planning_scene_interface.getKnownObjectNames();
+    if (known_objects.empty()) {
+        ROS_WARN("No collision objects found in the planning scene. Check the setup.");
+    } else {
+        ROS_INFO("Collision objects successfully added: %lu objects.", known_objects.size());
+    }
 
     // Define target poses
     geometry_msgs::Pose target_pose1, target_pose2;
@@ -139,14 +148,14 @@ int main(int argc, char **argv)
     target_pose2.position.y = 0.155;
     target_pose2.position.z = 0.033;
 
-    // Add an orientation constraint to keep the EEF straight
+    // Loosen orientation constraints
     moveit_msgs::OrientationConstraint ocm;
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.1;
-    ocm.absolute_y_axis_tolerance = 0.1;
-    ocm.absolute_z_axis_tolerance = 0.1;
+    ocm.absolute_x_axis_tolerance = 0.2; // Loosen tolerances
+    ocm.absolute_y_axis_tolerance = 0.2;
+    ocm.absolute_z_axis_tolerance = 0.2;
     ocm.weight = 1.0;
 
     moveit_msgs::Constraints path_constraints;
@@ -158,27 +167,35 @@ int main(int argc, char **argv)
     ROS_INFO("Starting planning and execution loop...");
     while (ros::ok())
     {
-        moveit::core::RobotStatePtr current_state = group.getCurrentState();
-        group.setStartState(*current_state);
+        group.setStartStateToCurrentState();
 
         geometry_msgs::Pose target_pose = toggle ? target_pose1 : target_pose2;
         group.setPoseTarget(target_pose);
 
         moveit::planning_interface::MoveGroupInterface::Plan global_plan;
-        moveit::planning_interface::MoveItErrorCode success = group.plan(global_plan);
+        auto success = group.plan(global_plan);
 
         if (success == moveit::planning_interface::MoveItErrorCode::SUCCESS)
         {
-            ROS_INFO("Plan succeeded. Executing...");
-            group.execute(global_plan);
+            ROS_INFO("Plan succeeded. Executing trajectory...");
+            auto execution_result = group.execute(global_plan); // Synchronous execution
+
+            if (execution_result == moveit::planning_interface::MoveItErrorCode::SUCCESS)
+            {
+                ROS_INFO("Execution succeeded. Robot reached the target.");
+            }
+            else
+            {
+                ROS_ERROR("Execution failed. Retrying...");
+            }
         }
         else
         {
-            ROS_ERROR("Planning failed.");
+            ROS_ERROR("Planning failed. Retrying...");
         }
 
         group.stop();
-        ros::Duration(0.1).sleep(); // Reduced pause to speed up the loop
+        ros::Duration(0.5).sleep(); // Pause to allow synchronization
         toggle = !toggle;
     }
 
