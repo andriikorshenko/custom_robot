@@ -213,16 +213,8 @@ int main(int argc, char **argv)
     group.setMaxAccelerationScalingFactor(1.0); // Maximum acceleration
 
     // Use RRTConnect planner
-    std::string planner_id = "RRTConnectkConfigDefault";
+    std::string planner_id = "RRTConnect";
     group.setPlannerId(planner_id);
-
-    // Dynamically set planner parameters
-    nh.setParam("/ompl_planner_configs/" + planner_id + "/range", 0.7); // Increased step size
-    nh.setParam("/ompl_planner_configs/" + planner_id + "/goal_bias", 0.15); // Increased goal bias
-    nh.setParam("/ompl_planner_configs/" + planner_id + "/threads", static_cast<int>(num_threads));
-    nh.setParam("/ompl_planner_configs/" + planner_id + "/max_nearest_neighbors", 150);
-    nh.setParam("/ompl_planner_configs/" + planner_id + "/min_step_length", 0.04);
-    nh.setParam("/ompl_planner_configs/" + planner_id + "/interpolation_steps", 15);
 
     // Set initial planning time
     double planning_time = 1.0; 
@@ -265,9 +257,9 @@ int main(int argc, char **argv)
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.1;
-    ocm.absolute_y_axis_tolerance = 0.1;
-    ocm.absolute_z_axis_tolerance = 0.1;
+    ocm.absolute_x_axis_tolerance = 0.5;
+    ocm.absolute_y_axis_tolerance = 0.5;
+    ocm.absolute_z_axis_tolerance = 0.5;
     ocm.weight = 1.0;
 
     moveit_msgs::Constraints path_constraints;
