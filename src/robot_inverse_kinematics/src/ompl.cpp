@@ -5,7 +5,7 @@
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <geometric_shapes/shape_operations.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <thread> // To get hardware concurrency
+#include <thread>
 
 const double tau = 2 * M_PI;
 
@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 
     shape_msgs::SolidPrimitive box_primitive;
     box_primitive.type = shape_msgs::SolidPrimitive::BOX;
-    box_primitive.dimensions = {0.5, 0.5, 0.1};
+    box_primitive.dimensions = {0.81, 0.74, 0.1}; // 810mm x 740mm x 100mm
 
     geometry_msgs::Pose box_pose;
     box_pose.orientation.w = 1.0;
@@ -82,6 +82,10 @@ int main(int argc, char **argv)
     collision_objects.push_back(box);
 
     // Add other collision objects (walls)
+    double wall_height = 0.59; // 590mm
+    double wall_length = 0.81; // Same as the table length (810mm)
+    double wall_thickness = 0.02; // 20mm
+
     // Front wall
     moveit_msgs::CollisionObject front_wall;
     front_wall.header.frame_id = "base_link";
@@ -89,13 +93,13 @@ int main(int argc, char **argv)
 
     shape_msgs::SolidPrimitive front_wall_primitive;
     front_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
-    front_wall_primitive.dimensions = {0.5, 0.02, 0.5};
+    front_wall_primitive.dimensions = {wall_length, wall_thickness, wall_height};
 
     geometry_msgs::Pose front_wall_pose;
     front_wall_pose.orientation.w = 1.0;
     front_wall_pose.position.x = 0.0;
-    front_wall_pose.position.y = 0.3; // Positioned in front of the cube
-    front_wall_pose.position.z = 0.25;
+    front_wall_pose.position.y = 0.37; // Positioned in front of the cube
+    front_wall_pose.position.z = wall_height / 2.0; // Center of the 590mm wall
 
     front_wall.primitives.push_back(front_wall_primitive);
     front_wall.primitive_poses.push_back(front_wall_pose);
@@ -109,30 +113,62 @@ int main(int argc, char **argv)
 
     shape_msgs::SolidPrimitive back_wall_primitive;
     back_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
-    back_wall_primitive.dimensions = {0.5, 0.02, 0.5};
+    back_wall_primitive.dimensions = {wall_length, wall_thickness, wall_height};
 
     geometry_msgs::Pose back_wall_pose;
     back_wall_pose.orientation.w = 1.0;
     back_wall_pose.position.x = 0.0;
-    back_wall_pose.position.y = -0.3; // Positioned behind the cube
-    back_wall_pose.position.z = 0.25;
+    back_wall_pose.position.y = -0.37; // Positioned behind the cube
+    back_wall_pose.position.z = wall_height / 2.0; // Center of the 590mm wall
 
     back_wall.primitives.push_back(back_wall_primitive);
     back_wall.primitive_poses.push_back(back_wall_pose);
     back_wall.operation = back_wall.ADD;
     collision_objects.push_back(back_wall);
 
+    // Left wall
+    moveit_msgs::CollisionObject left_wall;
+    left_wall.header.frame_id = "base_link";
+    left_wall.id = "left_wall";
+
+    shape_msgs::SolidPrimitive left_wall_primitive;
+    left_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
+    left_wall_primitive.dimensions = {wall_thickness, 0.74, wall_height}; // Adjust dimensions for the side wall
+
+    geometry_msgs::Pose left_wall_pose;
+    left_wall_pose.orientation.w = 1.0;
+    left_wall_pose.position.x = -0.40; // Positioned on the left
+    left_wall_pose.position.y = 0.0;  // Centered in the Y-direction
+    left_wall_pose.position.z = wall_height / 2.0; // Center of the 590mm wall
+
+    left_wall.primitives.push_back(left_wall_primitive);
+    left_wall.primitive_poses.push_back(left_wall_pose);
+    left_wall.operation = left_wall.ADD;
+    collision_objects.push_back(left_wall);
+
+    // Right wall
+    moveit_msgs::CollisionObject right_wall;
+    right_wall.header.frame_id = "base_link";
+    right_wall.id = "right_wall";
+
+    shape_msgs::SolidPrimitive right_wall_primitive;
+    right_wall_primitive.type = shape_msgs::SolidPrimitive::BOX;
+    right_wall_primitive.dimensions = {wall_thickness, 0.74, wall_height}; // Adjust dimensions for the side wall
+
+    geometry_msgs::Pose right_wall_pose;
+    right_wall_pose.orientation.w = 1.0;
+    right_wall_pose.position.x = 0.40; // Positioned on the right
+    right_wall_pose.position.y = 0.0;  // Centered in the Y-direction
+    right_wall_pose.position.z = wall_height / 2.0; // Center of the 590mm wall
+
+    right_wall.primitives.push_back(right_wall_primitive);
+    right_wall.primitive_poses.push_back(right_wall_pose);
+    right_wall.operation = right_wall.ADD;
+    collision_objects.push_back(right_wall);
+
     planning_scene_interface.addCollisionObjects(collision_objects);
     ROS_INFO("Added collision objects. Waiting for the planning scene to update...");
     ros::Duration(1.0).sleep();
-
-    // Verify collision objects
-    auto known_objects = planning_scene_interface.getKnownObjectNames();
-    if (known_objects.empty()) {
-        ROS_WARN("No collision objects found in the planning scene. Check the setup.");
-    } else {
-        ROS_INFO("Collision objects successfully added: %lu objects.", known_objects.size());
-    }
 
     // Define target poses
     geometry_msgs::Pose target_pose1, target_pose2;
@@ -163,6 +199,7 @@ int main(int argc, char **argv)
     group.setPathConstraints(path_constraints);
 
     // Planning and execution loop
+   
     bool toggle = true;
     ROS_INFO("Starting planning and execution loop...");
     while (ros::ok())
