@@ -175,14 +175,14 @@ int main(int argc, char **argv)
     tf2::Quaternion orientation;
     orientation.setRPY(-tau / 2, 0, 0); // Keep EEF orientation straight
     target_pose1.orientation = tf2::toMsg(orientation);
-    target_pose1.position.x = 0.272;
-    target_pose1.position.y = 0.004;
-    target_pose1.position.z = 0.110;
+    target_pose1.position.x = 0.301;
+    target_pose1.position.y = -0.303;
+    target_pose1.position.z = 0.121;
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.234;
-    target_pose2.position.y = 0.155;
-    target_pose2.position.z = 0.033;
+    target_pose2.position.x = -0.200;
+    target_pose2.position.y = -0.245;
+    target_pose2.position.z = 0.040;
 
     // Loosen orientation constraints
     moveit_msgs::OrientationConstraint ocm;
