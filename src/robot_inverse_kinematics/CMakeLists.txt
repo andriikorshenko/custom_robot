@@ -180,6 +180,10 @@ add_executable(ompl src/ompl.cpp)
 add_dependencies(ompl ${cobot_test_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(ompl ${catkin_LIBRARIES})
 
+add_executable(ompl_smpl src/ompl_smpl.cpp)
+add_dependencies(ompl_smpl ${cobot_test_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(ompl_smpl ${catkin_LIBRARIES})
+
 #############
 ## Install ##
 #############
