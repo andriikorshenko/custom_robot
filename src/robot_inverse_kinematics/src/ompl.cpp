@@ -183,9 +183,9 @@ int main(int argc, char **argv)
 
     // Set planning parameters
     group.setMaxVelocityScalingFactor(0.75);
-    group.setMaxAccelerationScalingFactor(1.0);
+    group.setMaxAccelerationScalingFactor(1);
     group.setPlannerId("RRTConnect");
-    double planning_time = 1.0;
+    double planning_time = 2.0;
     group.setPlanningTime(planning_time);
     group.setPoseReferenceFrame("base_link");
 
@@ -215,9 +215,9 @@ int main(int argc, char **argv)
     target_pose1.position.z = 0.121;
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.200;
-    target_pose2.position.y = -0.245;
-    target_pose2.position.z = 0.040;
+    target_pose2.position.x = -0.313;
+    target_pose2.position.y = -0.231;
+    target_pose2.position.z = 0.035;
 
     // Define orientation constraints
     moveit_msgs::OrientationConstraint ocm;
