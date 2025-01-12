@@ -209,8 +209,8 @@ int main(int argc, char **argv)
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
     // Maximize velocity and acceleration
-    group.setMaxVelocityScalingFactor(1.0); // Maximum velocity
-    group.setMaxAccelerationScalingFactor(1.0); // Maximum acceleration
+    group.setMaxVelocityScalingFactor(0.75);
+    group.setMaxAccelerationScalingFactor(1);
 
     // Use RRTConnect planner
     std::string planner_id = "RRTConnect";
@@ -257,9 +257,9 @@ int main(int argc, char **argv)
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.5;
-    ocm.absolute_y_axis_tolerance = 0.5;
-    ocm.absolute_z_axis_tolerance = 0.5;
+    ocm.absolute_x_axis_tolerance = 0.1;
+    ocm.absolute_y_axis_tolerance = 0.1;
+    ocm.absolute_z_axis_tolerance = 0.1;
     ocm.weight = 1.0;
 
     moveit_msgs::Constraints path_constraints;
@@ -322,18 +322,17 @@ int main(int argc, char **argv)
 
             // Asynchronous planning
             std::future<moveit::planning_interface::MoveGroupInterface::Plan> plan_future =
-                std::async(std::launch::async, [&group]() {
+                std::async(std::launch::async, [&group]() -> moveit::planning_interface::MoveGroupInterface::Plan {
                     moveit::planning_interface::MoveGroupInterface::Plan plan;
-                    bool success = (group.plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
-                    if (success) {
-                        return plan;
-                    } else {
-                        // Return an empty plan on failure
-                        return moveit::planning_interface::MoveGroupInterface::Plan();
+                    const int max_retries = 10;
+                    for (int attempt = 1; attempt <= max_retries; ++attempt) {
+                        auto result = group.plan(plan);
+                        if (result == moveit::core::MoveItErrorCode::SUCCESS) {
+                            return plan;
+                        }
                     }
+                    throw std::runtime_error("Motion planning failed after multiple attempts.");
                 });
-
-            // You can perform other tasks here while planning is ongoing
 
             // Retrieve the plan
             global_plan = plan_future.get();
@@ -359,7 +358,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                ROS_ERROR("Planning failed. Retrying...");
+                ROS_ERROR("Planning failed. Retrying ...");
                 // Adjust planning time
                 planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
                 group.setPlanningTime(planning_time);
@@ -387,6 +386,7 @@ int main(int argc, char **argv)
         if (exec_result == moveit::core::MoveItErrorCode::SUCCESS)
         {
             ROS_INFO("Execution succeeded. Robot reached the target.");
+
             // Adjust planning time
             planning_time = std::max(min_planning_time, planning_time - planning_time_decrement);
             group.setPlanningTime(planning_time);
@@ -395,6 +395,7 @@ int main(int argc, char **argv)
         else
         {
             ROS_ERROR("Execution failed. Retrying...");
+            
             // Adjust planning time
             planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
             group.setPlanningTime(planning_time);
@@ -402,10 +403,9 @@ int main(int argc, char **argv)
 
         // Clear pose targets for the next iteration
         group.clearPoseTargets();
-        // Do NOT clear path constraints to maintain orientation constraints across iterations
 
         // Pause to allow synchronization
-        ros::Duration(0.5).sleep();
+        ros::Duration(0.1).sleep();
         toggle = !toggle;
     }
 
