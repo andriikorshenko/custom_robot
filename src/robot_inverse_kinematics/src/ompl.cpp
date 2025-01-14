@@ -1,5 +1,5 @@
 /****************************************************
- * Updated Example with Guaranteed Collision Additions
+ * Final Example Without Waiting for /get_planning_scene
  ****************************************************/
 
 // Includes
@@ -27,7 +27,7 @@ const double POSE_PRECISION = 1e-3; // Tolerance for comparing poses
 // Mutex for thread-safe operations
 std::mutex plan_cache_mutex;
 
-// PosePair struct
+// Structure to hold a pair of poses (start and goal)
 struct PosePair {
     geometry_msgs::Pose start;
     geometry_msgs::Pose goal;
@@ -46,25 +46,26 @@ struct PosePair {
     }
 };
 
-// Hash for PosePair
+// Custom hash function for PosePair
 struct PosePairHash {
-    std::size_t operator()(const PosePair &p) const {
+    std::size_t operator()(const PosePair& p) const {
         auto hash_double = std::hash<double>();
         auto quantize = [&](double v) -> double {
             return std::round(v / POSE_PRECISION);
         };
-
         auto hash_pose = [&](const geometry_msgs::Pose &pose) -> std::size_t {
             std::size_t seed = 0;
             // Position
             seed ^= hash_double(quantize(pose.position.x)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             seed ^= hash_double(quantize(pose.position.y)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             seed ^= hash_double(quantize(pose.position.z)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
             // Orientation
             seed ^= hash_double(quantize(pose.orientation.x)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             seed ^= hash_double(quantize(pose.orientation.y)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             seed ^= hash_double(quantize(pose.orientation.z)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             seed ^= hash_double(quantize(pose.orientation.w)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
             return seed;
         };
 
@@ -75,7 +76,7 @@ struct PosePairHash {
     }
 };
 
-// Helper to create a Box collision object
+// Helper to create a box collision object
 moveit_msgs::CollisionObject createBox(const std::string &id,
                                        const geometry_msgs::Pose &pose,
                                        const std::vector<double> &dims,
@@ -97,7 +98,8 @@ moveit_msgs::CollisionObject createBox(const std::string &id,
 }
 
 // Create your collision objects (e.g., floor, walls, test box)
-std::vector<moveit_msgs::CollisionObject> createCollisionObjects() {
+std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
+{
     std::vector<moveit_msgs::CollisionObject> collision_objects;
     collision_objects.reserve(6);
 
@@ -105,24 +107,21 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects() {
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
-        pose.position.x = 0.0;
-        pose.position.y = 0.0;
         pose.position.z = -0.05;
         collision_objects.push_back(createBox("box_under_robot", pose, {0.81, 0.74, 0.1}));
     }
 
     // 2) Walls
-    double wall_height = 0.59; // 590mm
-    double wall_length = 0.81; // 810mm
+    double wall_height = 0.59;    // 590mm
+    double wall_length = 0.81;    // 810mm
     double wall_thickness = 0.02; // 20mm
 
     // Front wall
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
-        pose.position.x = 0.0;
         pose.position.y = 0.37;
-        pose.position.z = wall_height / 2.0; 
+        pose.position.z = wall_height / 2.0;
         collision_objects.push_back(createBox("front_wall", pose, {wall_length, wall_thickness, wall_height}));
     }
 
@@ -130,7 +129,6 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects() {
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
-        pose.position.x = 0.0;
         pose.position.y = -0.37;
         pose.position.z = wall_height / 2.0;
         collision_objects.push_back(createBox("back_wall", pose, {wall_length, wall_thickness, wall_height}));
@@ -141,7 +139,6 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects() {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
         pose.position.x = -0.40;
-        pose.position.y = 0.0;
         pose.position.z = wall_height / 2.0;
         collision_objects.push_back(createBox("left_wall", pose, {wall_thickness, 0.74, wall_height}));
     }
@@ -151,7 +148,6 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects() {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
         pose.position.x = 0.40;
-        pose.position.y = 0.0;
         pose.position.z = wall_height / 2.0;
         collision_objects.push_back(createBox("right_wall", pose, {wall_thickness, 0.74, wall_height}));
     }
@@ -180,7 +176,7 @@ moveit::planning_interface::MoveGroupInterface::Plan performAsynchronousPlanning
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "ompl_planner_with_caching_collision_update");
+    ros::init(argc, argv, "final_no_wait_code");
     ros::NodeHandle nh;
 
     if (!ros::master::check()) {
@@ -188,46 +184,41 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Spinner
+    // Start AsyncSpinner
     ros::AsyncSpinner spinner(2);
     spinner.start();
     ros::Duration(1.0).sleep();
 
-    // MoveIt group
+    // MoveIt: group + PlanningSceneInterface
     moveit::planning_interface::MoveGroupInterface group("manipulator");
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
-    // Basic planning settings
     group.setMaxVelocityScalingFactor(0.75);
     group.setMaxAccelerationScalingFactor(1.0);
     group.setPlannerId("RRTConnect");
     double planning_time = 2.0;
     group.setPlanningTime(planning_time);
 
-    // If your real root link is not "base_link", change here
+    // If your robot's root link is different, replace "base_link"
     group.setPoseReferenceFrame("base_link");
     ROS_INFO_STREAM("Planner ID: " << group.getPlannerId());
     ROS_INFO_STREAM("Pose reference frame: " << group.getPoseReferenceFrame());
 
-    // DisplayTrajectory publisher
+    // Publisher for trajectory visualization
     ros::Publisher display_pub =
         nh.advertise<moveit_msgs::DisplayTrajectory>("display_planned_path", 1, true);
     moveit_msgs::DisplayTrajectory display_trajectory;
 
-    // Planning Scene Monitor
+    // Create a PlanningSceneMonitor but DO NOT call requestPlanningSceneState()
     planning_scene_monitor::PlanningSceneMonitor psm("robot_description");
-    if (!psm.requestPlanningSceneState()) {
-        ROS_WARN("Could not request the current planning scene state");
-    }
+    // We start monitors so we see updates, but no waiting on /get_planning_scene:
     psm.startSceneMonitor("/move_group/monitored_planning_scene");
     psm.startWorldGeometryMonitor();
     psm.startStateMonitor();
     psm.providePlanningSceneService();
     psm.setPlanningScenePublishingFrequency(10.0);
 
-    /*******************************************************
-     * 1) Remove any old collision objects (clean slate)
-     *******************************************************/
+    // 1) Remove old objects (no infinite wait).
     std::vector<std::string> old_objects = planning_scene_interface.getKnownObjectNames();
     if (!old_objects.empty()) {
         ROS_INFO("Removing %zu old objects from the scene...", old_objects.size());
@@ -235,31 +226,21 @@ int main(int argc, char **argv)
         ros::Duration(1.0).sleep();
     }
 
-    /*******************************************************
-     * 2) Create and apply new collision objects
-     *******************************************************/
+    // 2) Create and apply new collision objects
     auto collision_objects = createCollisionObjects();
-    ROS_INFO("Creating %zu new collision objects...", collision_objects.size());
+    ROS_INFO("Applying %zu collision objects (no infinite wait)...", collision_objects.size());
 
-    // Multiple attempts to apply
-    for (int attempt = 1; attempt <= 3; ++attempt) {
-        planning_scene_interface.applyCollisionObjects(collision_objects);
-        ROS_INFO("Attempt %d: applied collision objects. Waiting for scene update...", attempt);
-        ros::Duration(1.0).sleep();
-    }
+    planning_scene_interface.applyCollisionObjects(collision_objects);
+    ros::Duration(1.0).sleep(); // Let the scene update briefly
 
     // Confirm known objects
     auto known_objs = planning_scene_interface.getKnownObjectNames();
-    ROS_INFO("Now known objects in the scene:");
+    ROS_INFO("Known objects now in the scene:");
     for (const auto &name : known_objs) {
         ROS_INFO_STREAM("  - " << name);
     }
 
-    ros::Duration(1.0).sleep(); // Extra wait for final updates
-
-    /*******************************************************
-     * 3) Define target poses and orientation constraint
-     *******************************************************/
+    // 3) Define target poses and constraints
     geometry_msgs::Pose target_pose1, target_pose2;
     tf2::Quaternion orientation;
     orientation.setRPY(-TAU / 2, 0, 0); // Example orientation
@@ -286,9 +267,7 @@ int main(int argc, char **argv)
     path_constraints.orientation_constraints.push_back(ocm);
     group.setPathConstraints(path_constraints);
 
-    /*******************************************************
-     * 4) Prepare plan caching structure
-     *******************************************************/
+    // 4) Plan cache
     std::unordered_map<PosePair, moveit::planning_interface::MoveGroupInterface::Plan, PosePairHash> plan_cache;
 
     // Variables for dynamic planning time
@@ -299,9 +278,7 @@ int main(int argc, char **argv)
     const double min_planning_time = 2.0;
     const double max_planning_time = 10.0;
 
-    /*******************************************************
-     * 5) Main planning & execution loop
-     *******************************************************/
+    // 5) Main planning & execution loop
     bool toggle = true;
     ROS_INFO("Starting planning and execution loop...");
     while (ros::ok()) {
@@ -313,9 +290,7 @@ int main(int argc, char **argv)
         geometry_msgs::Pose target_pose = toggle ? target_pose1 : target_pose2;
 
         // Create a PosePair
-        PosePair current_pair;
-        current_pair.start = current_pose;
-        current_pair.goal = target_pose;
+        PosePair current_pair{current_pose, target_pose};
 
         moveit::planning_interface::MoveGroupInterface::Plan global_plan;
         bool plan_found_in_cache = false;
@@ -383,7 +358,7 @@ int main(int argc, char **argv)
                 consecutive_failures++;
 
                 if (consecutive_failures >= max_failures) {
-                    ROS_WARN("Max consecutive planning failures. Reset planning time to 5.0s");
+                    ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
                     planning_time = 5.0;
                     group.setPlanningTime(planning_time);
                     consecutive_failures = 0;
