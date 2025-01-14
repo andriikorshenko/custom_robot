@@ -198,8 +198,8 @@ int main(int argc, char **argv)
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
     // Further lowered velocity and acceleration scaling factors
-    group.setMaxVelocityScalingFactor(0.3);      // Lowered from 0.75
-    group.setMaxAccelerationScalingFactor(0.3);  // Lowered from 1.0
+    group.setMaxVelocityScalingFactor(1);      // Lowered from 0.75
+    group.setMaxAccelerationScalingFactor(1);  // Lowered from 1.0
 
     group.setPlannerId("RRTConnect");
     double planning_time = 5.0; // Increased planning time
@@ -264,10 +264,10 @@ int main(int argc, char **argv)
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.05; // Reduced tolerance for tighter constraint
-    ocm.absolute_y_axis_tolerance = 0.05;
-    ocm.absolute_z_axis_tolerance = 0.05;
-    ocm.weight = 1.0;
+    ocm.absolute_x_axis_tolerance = 0.5; // Reduced tolerance for tighter constraint
+    ocm.absolute_y_axis_tolerance = 0.5;
+    ocm.absolute_z_axis_tolerance = 0.5;
+    ocm.weight = 0.5;
 
     moveit_msgs::Constraints path_constraints;
     path_constraints.orientation_constraints.push_back(ocm);
