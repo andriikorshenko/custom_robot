@@ -1,5 +1,6 @@
 /****************************************************
- * Final Example Without Waiting for /get_planning_scene
+ * Final Example (Reintroduced Orientation Constraints)
+ * Ready for Copy & Paste
  ****************************************************/
 
 // Includes
@@ -11,9 +12,6 @@
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <geometric_shapes/shape_operations.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <thread>
-#include <future>
-#include <unordered_map>
 #include <ros/ros.h>
 #include <mutex>
 #include <cmath>
@@ -23,9 +21,6 @@
 // Constants
 const double TAU = 2 * M_PI;
 const double POSE_PRECISION = 1e-3; // Tolerance for comparing poses
-
-// Mutex for thread-safe operations
-std::mutex plan_cache_mutex;
 
 // Structure to hold a pair of poses (start and goal)
 struct PosePair {
@@ -101,7 +96,7 @@ moveit_msgs::CollisionObject createBox(const std::string &id,
 std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
 {
     std::vector<moveit_msgs::CollisionObject> collision_objects;
-    collision_objects.reserve(6);
+    collision_objects.reserve(5);
 
     // 1) Box under the robot
     {
@@ -111,72 +106,80 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
         collision_objects.push_back(createBox("box_under_robot", pose, {0.81, 0.74, 0.1}));
     }
 
-    // 2) Walls
-    double wall_height = 0.59;    // 590mm
-    double wall_length = 0.81;    // 810mm
-    double wall_thickness = 0.02; // 20mm
-
-    // Front wall
+    // 2) Front wall
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
         pose.position.y = 0.37;
-        pose.position.z = wall_height / 2.0;
-        collision_objects.push_back(createBox("front_wall", pose, {wall_length, wall_thickness, wall_height}));
+        pose.position.z = 0.59 / 2.0; // wall_height / 2.0
+        collision_objects.push_back(createBox("front_wall", pose, {0.81, 0.02, 0.59}));
     }
 
-    // Back wall
+    // 3) Back wall
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
         pose.position.y = -0.37;
-        pose.position.z = wall_height / 2.0;
-        collision_objects.push_back(createBox("back_wall", pose, {wall_length, wall_thickness, wall_height}));
+        pose.position.z = 0.59 / 2.0;
+        collision_objects.push_back(createBox("back_wall", pose, {0.81, 0.02, 0.59}));
     }
 
-    // Left wall
+    // 4) Left wall
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
         pose.position.x = -0.40;
-        pose.position.z = wall_height / 2.0;
-        collision_objects.push_back(createBox("left_wall", pose, {wall_thickness, 0.74, wall_height}));
+        pose.position.z = 0.59 / 2.0;
+        collision_objects.push_back(createBox("left_wall", pose, {0.02, 0.74, 0.59}));
     }
 
-    // Right wall
+    // 5) Right wall
     {
         geometry_msgs::Pose pose;
         pose.orientation.w = 1.0;
         pose.position.x = 0.40;
-        pose.position.z = wall_height / 2.0;
-        collision_objects.push_back(createBox("right_wall", pose, {wall_thickness, 0.74, wall_height}));
+        pose.position.z = 0.59 / 2.0;
+        collision_objects.push_back(createBox("right_wall", pose, {0.02, 0.74, 0.59}));
     }
 
     return collision_objects;
 }
 
-// Asynchronous planning function
-moveit::planning_interface::MoveGroupInterface::Plan performAsynchronousPlanning(
-    moveit::planning_interface::MoveGroupInterface &group, int max_retries = 10)
+// Synchronous planning function
+bool performSynchronousPlanning(moveit::planning_interface::MoveGroupInterface &group,
+                                moveit::planning_interface::MoveGroupInterface::Plan &plan,
+                                int max_retries = 10)
 {
-    return std::async(std::launch::async, [&group, max_retries]() {
-        moveit::planning_interface::MoveGroupInterface::Plan plan;
-        for (int attempt = 1; attempt <= max_retries; ++attempt) {
-            auto result = group.plan(plan);
-            if (result == moveit::core::MoveItErrorCode::SUCCESS) {
-                ROS_INFO("Planning succeeded on attempt %d.", attempt);
-                return plan;
-            } else {
-                ROS_WARN("Planning attempt %d failed with error code: %d.", attempt, result.val);
-            }
+    for (int attempt = 1; attempt <= max_retries; ++attempt) {
+        moveit::planning_interface::MoveItErrorCode result = group.plan(plan);
+        if (result == moveit::core::MoveItErrorCode::SUCCESS) {
+            ROS_INFO("Planning succeeded on attempt %d.", attempt);
+            return true;
+        } else {
+            ROS_WARN("Planning attempt %d failed with error code: %d.", attempt, result.val);
         }
-        throw std::runtime_error("Motion planning failed after multiple attempts.");
-    }).get();
+    }
+    ROS_ERROR("Motion planning failed after %d attempts.", max_retries);
+    return false;
+}
+
+// Function to ensure strictly increasing time_from_start
+bool fixTrajectoryTiming(moveit_msgs::RobotTrajectory &trajectory, double min_increment = 0.1)
+{
+    bool fixed = false;
+    for (size_t i = 1; i < trajectory.joint_trajectory.points.size(); ++i) {
+        if (trajectory.joint_trajectory.points[i].time_from_start <= trajectory.joint_trajectory.points[i - 1].time_from_start) {
+            trajectory.joint_trajectory.points[i].time_from_start = trajectory.joint_trajectory.points[i - 1].time_from_start + ros::Duration(min_increment);
+            fixed = true;
+            ROS_WARN("Adjusted time_from_start for point %zu to %.3f seconds.", i, trajectory.joint_trajectory.points[i].time_from_start.toSec());
+        }
+    }
+    return fixed;
 }
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "final_no_wait_code");
+    ros::init(argc, argv, "final_no_wait_code_fixed_with_constraints");
     ros::NodeHandle nh;
 
     if (!ros::master::check()) {
@@ -193,10 +196,12 @@ int main(int argc, char **argv)
     moveit::planning_interface::MoveGroupInterface group("manipulator");
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
-    group.setMaxVelocityScalingFactor(0.75);
-    group.setMaxAccelerationScalingFactor(1.0);
+    // Further lowered velocity and acceleration scaling factors
+    group.setMaxVelocityScalingFactor(0.75);      // Lowered from 0.75
+    group.setMaxAccelerationScalingFactor(1.0);  // Lowered from 1.0
+
     group.setPlannerId("RRTConnect");
-    double planning_time = 2.0;
+    double planning_time = 5.0; // Increased planning time
     group.setPlanningTime(planning_time);
 
     // If your robot's root link is different, replace "base_link"
@@ -209,16 +214,15 @@ int main(int argc, char **argv)
         nh.advertise<moveit_msgs::DisplayTrajectory>("display_planned_path", 1, true);
     moveit_msgs::DisplayTrajectory display_trajectory;
 
-    // Create a PlanningSceneMonitor but DO NOT call requestPlanningSceneState()
+    // Create a PlanningSceneMonitor (no waiting on /get_planning_scene)
     planning_scene_monitor::PlanningSceneMonitor psm("robot_description");
-    // We start monitors so we see updates, but no waiting on /get_planning_scene:
     psm.startSceneMonitor("/move_group/monitored_planning_scene");
     psm.startWorldGeometryMonitor();
     psm.startStateMonitor();
     psm.providePlanningSceneService();
     psm.setPlanningScenePublishingFrequency(10.0);
 
-    // 1) Remove old objects (no infinite wait).
+    // 1) Remove old objects
     std::vector<std::string> old_objects = planning_scene_interface.getKnownObjectNames();
     if (!old_objects.empty()) {
         ROS_INFO("Removing %zu old objects from the scene...", old_objects.size());
@@ -240,35 +244,34 @@ int main(int argc, char **argv)
         ROS_INFO_STREAM("  - " << name);
     }
 
-    // 3) Define target poses and constraints
+    // 3) Define target poses with the same orientation
     geometry_msgs::Pose target_pose1, target_pose2;
     tf2::Quaternion orientation;
-    orientation.setRPY(-TAU / 2, 0, 0); // Example orientation
+    orientation.setRPY(-TAU / 2, 0, 0); // Example orientation (straight)
     target_pose1.orientation = tf2::toMsg(orientation);
-    target_pose1.position.x = 0.301;
-    target_pose1.position.y = -0.303;
-    target_pose1.position.z = 0.121;
+    target_pose1.position.x = 0.276;
+    target_pose1.position.y = -0.197;
+    target_pose1.position.z = 0.305;
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.313;
-    target_pose2.position.y = -0.231;
-    target_pose2.position.z = 0.035;
+    target_pose2.position.x = -0.239;
+    target_pose2.position.y = 0.112;
+    target_pose2.position.z = 0.200;
 
+    // *** Reintroduce Orientation Path Constraints ***
     moveit_msgs::OrientationConstraint ocm;
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.1;
-    ocm.absolute_y_axis_tolerance = 0.1;
-    ocm.absolute_z_axis_tolerance = 0.1;
+    ocm.absolute_x_axis_tolerance = 0.5; // Reduced tolerance for tighter constraint
+    ocm.absolute_y_axis_tolerance = 0.5;
+    ocm.absolute_z_axis_tolerance = 0.5;
     ocm.weight = 1.0;
 
     moveit_msgs::Constraints path_constraints;
     path_constraints.orientation_constraints.push_back(ocm);
     group.setPathConstraints(path_constraints);
-
-    // 4) Plan cache
-    std::unordered_map<PosePair, moveit::planning_interface::MoveGroupInterface::Plan, PosePairHash> plan_cache;
+    ROS_INFO("Orientation path constraints set to maintain EEF straight.");
 
     // Variables for dynamic planning time
     int consecutive_failures = 0;
@@ -278,98 +281,115 @@ int main(int argc, char **argv)
     const double min_planning_time = 2.0;
     const double max_planning_time = 10.0;
 
-    // 5) Main planning & execution loop
+    // 4) Main planning & execution loop
     bool toggle = true;
-    ROS_INFO("Starting planning and execution loop...");
+    ROS_INFO("Starting planning and execution loop with orientation constraints...");
     while (ros::ok()) {
         // Current robot pose
         geometry_msgs::PoseStamped current_pose_stamped = group.getCurrentPose();
         geometry_msgs::Pose current_pose = current_pose_stamped.pose;
 
         // Toggle target pose
-        geometry_msgs::Pose target_pose = toggle ? target_pose1 : target_pose2;
+        geometry_msgs::Pose target_pose = (toggle ? target_pose1 : target_pose2);
 
-        // Create a PosePair
-        PosePair current_pair{current_pose, target_pose};
+        // Set the new goal pose
+        group.setStartStateToCurrentState(); // Ensure start state is current
+        group.setPoseTarget(target_pose);
+
+        // Time the planning
+        ros::Time start_time = ros::Time::now();
 
         moveit::planning_interface::MoveGroupInterface::Plan global_plan;
-        bool plan_found_in_cache = false;
+        bool planning_success = performSynchronousPlanning(group, global_plan, 10);
 
-        // Check plan cache
-        {
-            std::lock_guard<std::mutex> lock(plan_cache_mutex);
-            auto it = plan_cache.find(current_pair);
-            if (it != plan_cache.end()) {
-                ROS_INFO("Found plan in cache. Reusing cached trajectory.");
-                global_plan = it->second;
-                plan_found_in_cache = true;
+        if (!planning_success) {
+            // Increase planning time
+            planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            group.setPlanningTime(planning_time);
+            consecutive_failures++;
+
+            if (consecutive_failures >= max_failures) {
+                ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
+                planning_time = 5.0;
+                group.setPlanningTime(planning_time);
+                consecutive_failures = 0;
+            }
+
+            group.clearPoseTargets();
+            ros::Duration(0.5).sleep();
+            toggle = !toggle;
+            continue;
+        }
+
+        ros::Duration plan_dur = ros::Time::now() - start_time;
+        ROS_INFO("Planning took %.3f seconds", plan_dur.toSec());
+
+        // Check if plan is valid (>= 2 points)
+        auto &traj = global_plan.trajectory_.joint_trajectory;
+        if (traj.points.size() < 2) {
+            ROS_ERROR("Plan has fewer than 2 trajectory points. Discarding and retrying...");
+            // Increase planning time
+            planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            group.setPlanningTime(planning_time);
+            consecutive_failures++;
+
+            if (consecutive_failures >= max_failures) {
+                ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
+                planning_time = 5.0;
+                group.setPlanningTime(planning_time);
+                consecutive_failures = 0;
+            }
+
+            group.clearPoseTargets();
+            ros::Duration(0.5).sleep();
+            toggle = !toggle;
+            continue;
+        }
+
+        // Verify and fix strictly increasing time_from_start
+        bool timing_fixed = fixTrajectoryTiming(global_plan.trajectory_);
+        if (timing_fixed) {
+            ROS_WARN("Fixed trajectory timing to ensure strictly increasing time_from_start.");
+        }
+
+        // Re-verify after fixing
+        bool time_ok = true;
+        const auto &points = traj.points;
+        for (size_t i = 1; i < points.size(); ++i) {
+            if (points[i].time_from_start <= points[i - 1].time_from_start) {
+                ROS_ERROR("Trajectory message not strictly increasing in time at index %zu!", i);
+                time_ok = false;
+                break;
             }
         }
 
-        if (!plan_found_in_cache) {
-            // Not cached -> plan
-            group.setPoseTarget(target_pose);
-            ros::Time start_time = ros::Time::now();
+        if (!time_ok) {
+            ROS_ERROR("Discarding this plan due to invalid timing even after fixing. Retrying...");
+            // Increase planning time
+            planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            group.setPlanningTime(planning_time);
+            consecutive_failures++;
 
-            try {
-                global_plan = performAsynchronousPlanning(group, 10);
-            } catch (const std::exception &e) {
-                ROS_ERROR("Asynchronous planning failed: %s", e.what());
-                // Increase planning time
-                planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            if (consecutive_failures >= max_failures) {
+                ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
+                planning_time = 5.0;
                 group.setPlanningTime(planning_time);
-                consecutive_failures++;
-
-                if (consecutive_failures >= max_failures) {
-                    ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
-                    planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
-                    consecutive_failures = 0;
-                }
-
-                group.clearPoseTargets();
-                ros::Duration(0.5).sleep();
-                toggle = !toggle;
-                continue;
+                consecutive_failures = 0;
             }
 
-            ros::Duration plan_dur = ros::Time::now() - start_time;
-            ROS_INFO("Planning took %.3f seconds", plan_dur.toSec());
-
-            // Validate plan
-            if (!global_plan.trajectory_.joint_trajectory.points.empty()) {
-                // Cache new plan
-                {
-                    std::lock_guard<std::mutex> lock(plan_cache_mutex);
-                    plan_cache[current_pair] = global_plan;
-                }
-                ROS_INFO("Plan succeeded and cached. Executing now...");
-
-                // Visualize
-                display_trajectory.trajectory_start = global_plan.start_state_;
-                display_trajectory.trajectory.clear();
-                display_trajectory.trajectory.push_back(global_plan.trajectory_);
-                display_pub.publish(display_trajectory);
-            } else {
-                ROS_ERROR("Planning produced an empty trajectory. Retrying...");
-
-                planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
-                group.setPlanningTime(planning_time);
-                consecutive_failures++;
-
-                if (consecutive_failures >= max_failures) {
-                    ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
-                    planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
-                    consecutive_failures = 0;
-                }
-
-                group.clearPoseTargets();
-                ros::Duration(0.5).sleep();
-                toggle = !toggle;
-                continue;
-            }
+            group.clearPoseTargets();
+            ros::Duration(0.5).sleep();
+            toggle = !toggle;
+            continue;
         }
+
+        // Visualize the trajectory
+        display_trajectory.trajectory_start = global_plan.start_state_;
+        display_trajectory.trajectory.clear();
+        display_trajectory.trajectory.push_back(global_plan.trajectory_);
+        display_pub.publish(display_trajectory);
+
+        ROS_INFO("Plan succeeded with orientation constraints. Executing now...");
 
         // Execute the plan
         moveit::core::MoveItErrorCode exec_result = group.execute(global_plan);
@@ -381,6 +401,7 @@ int main(int argc, char **argv)
             consecutive_failures = 0;
         } else {
             ROS_ERROR("Execution failed. Retrying...");
+            // Increase planning time
             planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
             group.setPlanningTime(planning_time);
         }
