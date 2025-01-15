@@ -11,60 +11,10 @@
 #include <cmath>
 #include <functional>
 #include <iostream>
-#include <unordered_map> 
 
 // Constants
 const double TAU = 2 * M_PI;
 const double POSE_PRECISION = 1e-3; // Tolerance for comparing poses
-
-// Structure to hold a pair of poses (start and goal)
-struct PosePair {
-    geometry_msgs::Pose start;
-    geometry_msgs::Pose goal;
-
-    bool operator==(const PosePair &other) const {
-        auto eq = [&](const geometry_msgs::Pose &a, const geometry_msgs::Pose &b) {
-            return (std::fabs(a.position.x - b.position.x) < POSE_PRECISION &&
-                    std::fabs(a.position.y - b.position.y) < POSE_PRECISION &&
-                    std::fabs(a.position.z - b.position.z) < POSE_PRECISION &&
-                    std::fabs(a.orientation.x - b.orientation.x) < POSE_PRECISION &&
-                    std::fabs(a.orientation.y - b.orientation.y) < POSE_PRECISION &&
-                    std::fabs(a.orientation.z - b.orientation.z) < POSE_PRECISION &&
-                    std::fabs(a.orientation.w - b.orientation.w) < POSE_PRECISION);
-        };
-        return eq(start, other.start) && eq(goal, other.goal);
-    }
-};
-
-// Custom hash function for PosePair
-struct PosePairHash {
-    std::size_t operator()(const PosePair& p) const {
-        auto hash_double = std::hash<double>();
-        auto quantize = [&](double v) -> double {
-            return std::round(v / POSE_PRECISION);
-        };
-        auto hash_pose = [&](const geometry_msgs::Pose &pose) -> std::size_t {
-            std::size_t seed = 0;
-            // Position
-            seed ^= hash_double(quantize(pose.position.x)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            seed ^= hash_double(quantize(pose.position.y)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            seed ^= hash_double(quantize(pose.position.z)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-            // Orientation
-            seed ^= hash_double(quantize(pose.orientation.x)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            seed ^= hash_double(quantize(pose.orientation.y)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            seed ^= hash_double(quantize(pose.orientation.z)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            seed ^= hash_double(quantize(pose.orientation.w)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-
-            return seed;
-        };
-
-        std::size_t seed = 0;
-        seed ^= hash_pose(p.start) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= hash_pose(p.goal) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
-    }
-};
 
 // Helper to create a box collision object
 moveit_msgs::CollisionObject createBox(const std::string &id,
@@ -184,7 +134,7 @@ bool fixTrajectoryTiming(moveit_msgs::RobotTrajectory &trajectory, double min_in
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "final_no_wait_code_fixed_with_constraints_and_cache");
+    ros::init(argc, argv, "final_no_wait_code_fixed_with_constraints_no_cache");
     ros::NodeHandle nh;
 
     if (!ros::master::check()) {
@@ -279,13 +229,6 @@ int main(int argc, char **argv)
     group.setPathConstraints(path_constraints);
     ROS_INFO("Orientation path constraints set to maintain EEF straight.");
 
-    // *** Initialize Trajectory Cache ***
-    // Define a mutex to protect the cache
-    std::mutex cache_mutex;
-
-    // Define the cache: PosePair -> Plan
-    std::unordered_map<PosePair, moveit::planning_interface::MoveGroupInterface::Plan, PosePairHash> plan_cache;
-
     // Variables for dynamic planning time
     int consecutive_failures = 0;
     const int max_failures = 5;
@@ -296,7 +239,7 @@ int main(int argc, char **argv)
 
     // 4) Main planning & execution loop
     bool toggle = true;
-    ROS_INFO("Starting planning and execution loop with orientation constraints and caching...");
+    ROS_INFO("Starting planning and execution loop with orientation constraints (no caching)...");
     while (ros::ok()) {
         // Current robot pose
         geometry_msgs::PoseStamped current_pose_stamped = group.getCurrentPose();
@@ -305,133 +248,105 @@ int main(int argc, char **argv)
         // Toggle target pose
         geometry_msgs::Pose target_pose = (toggle ? target_pose1 : target_pose2);
 
-        // Create a PosePair
-        PosePair current_pair{current_pose, target_pose};
-
         moveit::planning_interface::MoveGroupInterface::Plan global_plan;
-        bool plan_found_in_cache = false;
 
-        {
-            // Lock the cache for thread safety
-            std::lock_guard<std::mutex> lock(cache_mutex);
-            auto it = plan_cache.find(current_pair);
-            if (it != plan_cache.end()) {
-                ROS_INFO("Found plan in cache. Using cached plan.");
-                global_plan = it->second;
-                plan_found_in_cache = true;
+        // Set the new goal pose
+        group.setStartStateToCurrentState(); // Ensure start state is current
+        group.setPoseTarget(target_pose);
+
+        // Time the planning
+        ros::Time start_time = ros::Time::now();
+
+        bool planning_success = performSynchronousPlanning(group, global_plan, 10);
+
+        if (!planning_success) {
+            // Increase planning time
+            planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            group.setPlanningTime(planning_time);
+            consecutive_failures++;
+
+            if (consecutive_failures >= max_failures) {
+                ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
+                planning_time = 5.0;
+                group.setPlanningTime(planning_time);
+                consecutive_failures = 0;
+            }
+
+            group.clearPoseTargets();
+            ros::Duration(0.5).sleep();
+            toggle = !toggle;
+            continue;
+        }
+
+        ros::Duration plan_dur = ros::Time::now() - start_time;
+        ROS_INFO("Planning took %.3f seconds", plan_dur.toSec());
+
+        // Check if plan is valid (>= 2 points)
+        auto &traj = global_plan.trajectory_.joint_trajectory;
+        if (traj.points.size() < 2) {
+            ROS_ERROR("Plan has fewer than 2 trajectory points. Discarding and retrying...");
+            // Increase planning time
+            planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            group.setPlanningTime(planning_time);
+            consecutive_failures++;
+
+            if (consecutive_failures >= max_failures) {
+                ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
+                planning_time = 5.0;
+                group.setPlanningTime(planning_time);
+                consecutive_failures = 0;
+            }
+
+            group.clearPoseTargets();
+            ros::Duration(0.5).sleep();
+            toggle = !toggle;
+            continue;
+        }
+
+        // Verify and fix strictly increasing time_from_start
+        bool timing_fixed = fixTrajectoryTiming(global_plan.trajectory_);
+        if (timing_fixed) {
+            ROS_WARN("Fixed trajectory timing to ensure strictly increasing time_from_start.");
+        }
+
+        // Re-verify after fixing
+        bool time_ok = true;
+        const auto &points = traj.points;
+        for (size_t i = 1; i < points.size(); ++i) {
+            if (points[i].time_from_start <= points[i - 1].time_from_start) {
+                ROS_ERROR("Trajectory message not strictly increasing in time at index %zu!", i);
+                time_ok = false;
+                break;
             }
         }
 
-        if (!plan_found_in_cache) {
-            // Set the new goal pose
-            group.setStartStateToCurrentState(); // Ensure start state is current
-            group.setPoseTarget(target_pose);
+        if (!time_ok) {
+            ROS_ERROR("Discarding this plan due to invalid timing even after fixing. Retrying...");
+            // Increase planning time
+            planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            group.setPlanningTime(planning_time);
+            consecutive_failures++;
 
-            // Time the planning
-            ros::Time start_time = ros::Time::now();
-
-            bool planning_success = performSynchronousPlanning(group, global_plan, 10);
-
-            if (!planning_success) {
-                // Increase planning time
-                planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
+            if (consecutive_failures >= max_failures) {
+                ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
+                planning_time = 5.0;
                 group.setPlanningTime(planning_time);
-                consecutive_failures++;
-
-                if (consecutive_failures >= max_failures) {
-                    ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
-                    planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
-                    consecutive_failures = 0;
-                }
-
-                group.clearPoseTargets();
-                ros::Duration(0.5).sleep();
-                toggle = !toggle;
-                continue;
+                consecutive_failures = 0;
             }
 
-            ros::Duration plan_dur = ros::Time::now() - start_time;
-            ROS_INFO("Planning took %.3f seconds", plan_dur.toSec());
-
-            // Check if plan is valid (>= 2 points)
-            auto &traj = global_plan.trajectory_.joint_trajectory;
-            if (traj.points.size() < 2) {
-                ROS_ERROR("Plan has fewer than 2 trajectory points. Discarding and retrying...");
-                // Increase planning time
-                planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
-                group.setPlanningTime(planning_time);
-                consecutive_failures++;
-
-                if (consecutive_failures >= max_failures) {
-                    ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
-                    planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
-                    consecutive_failures = 0;
-                }
-
-                group.clearPoseTargets();
-                ros::Duration(0.5).sleep();
-                toggle = !toggle;
-                continue;
-            }
-
-            // Verify and fix strictly increasing time_from_start
-            bool timing_fixed = fixTrajectoryTiming(global_plan.trajectory_);
-            if (timing_fixed) {
-                ROS_WARN("Fixed trajectory timing to ensure strictly increasing time_from_start.");
-            }
-
-            // Re-verify after fixing
-            bool time_ok = true;
-            const auto &points = traj.points;
-            for (size_t i = 1; i < points.size(); ++i) {
-                if (points[i].time_from_start <= points[i - 1].time_from_start) {
-                    ROS_ERROR("Trajectory message not strictly increasing in time at index %zu!", i);
-                    time_ok = false;
-                    break;
-                }
-            }
-
-            if (!time_ok) {
-                ROS_ERROR("Discarding this plan due to invalid timing even after fixing. Retrying...");
-                // Increase planning time
-                planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
-                group.setPlanningTime(planning_time);
-                consecutive_failures++;
-
-                if (consecutive_failures >= max_failures) {
-                    ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
-                    planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
-                    consecutive_failures = 0;
-                }
-
-                group.clearPoseTargets();
-                ros::Duration(0.5).sleep();
-                toggle = !toggle;
-                continue;
-            }
-
-            // *** Add the new plan to the cache ***
-            {
-                std::lock_guard<std::mutex> lock(cache_mutex);
-                plan_cache[current_pair] = global_plan;
-                ROS_INFO("Plan cached for the current pose pair.");
-            }
-
-            // Visualize the trajectory
-            display_trajectory.trajectory_start = global_plan.start_state_;
-            display_trajectory.trajectory.clear();
-            display_trajectory.trajectory.push_back(global_plan.trajectory_);
-            display_pub.publish(display_trajectory);
-
-            ROS_INFO("Plan succeeded and cached. Executing now...");
-        } else {
-            // If reusing a cached plan, optionally verify its validity
-            // (e.g., check if the robot state has changed significantly)
-            ROS_INFO("Reusing cached plan. Executing now...");
+            group.clearPoseTargets();
+            ros::Duration(0.5).sleep();
+            toggle = !toggle;
+            continue;
         }
+
+        // Visualize the trajectory
+        display_trajectory.trajectory_start = global_plan.start_state_;
+        display_trajectory.trajectory.clear();
+        display_trajectory.trajectory.push_back(global_plan.trajectory_);
+        display_pub.publish(display_trajectory);
+
+        ROS_INFO("Plan succeeded. Executing now...");
 
         // Execute the plan
         moveit::core::MoveItErrorCode exec_result = group.execute(global_plan);
