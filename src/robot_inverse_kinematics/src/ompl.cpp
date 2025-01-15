@@ -137,15 +137,15 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
         collision_objects.push_back(createBox("right_wall", pose, {0.02, 0.74, 0.59}));
     }
     
-    // 6) New box at the arrow's location
-     {
-         geometry_msgs::Pose pose;
-         pose.orientation.w = 1.0;
-         pose.position.x = 0.3; // Replace with the actual X coordinate of the arrow
-         pose.position.y = -0.1; // Replace with the actual Y coordinate of the arrow
-         pose.position.z = 0.075; // Half of the height (15 cm / 2) to center the box on the floor
-         collision_objects.push_back(createBox("small_box", pose, {0.15, 0.15, 0.15})); // 15 cm x 15 cm x 15 cm box
-     }
+    // // 6) New box at the arrow's location
+    //  {
+    //      geometry_msgs::Pose pose;
+    //      pose.orientation.w = 1.0;
+    //      pose.position.x = 0.3; // Replace with the actual X coordinate of the arrow
+    //      pose.position.y = -0.1; // Replace with the actual Y coordinate of the arrow
+    //      pose.position.z = 0.075; // Half of the height (15 cm / 2) to center the box on the floor
+    //      collision_objects.push_back(createBox("small_box", pose, {0.15, 0.15, 0.15})); // 15 cm x 15 cm x 15 cm box
+    //  }
 
     return collision_objects;
 }
@@ -255,14 +255,14 @@ int main(int argc, char **argv)
     tf2::Quaternion orientation;
     orientation.setRPY(-TAU / 2, 0, 0); // Example orientation (straight)
     target_pose1.orientation = tf2::toMsg(orientation);
-    target_pose1.position.x = 0.276;
-    target_pose1.position.y = -0.197;
-    target_pose1.position.z = 0.305;
+    target_pose1.position.x = 0.301;
+    target_pose1.position.y = -0.303;
+    target_pose1.position.z = 0.121;
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.239;
-    target_pose2.position.y = 0.112;
-    target_pose2.position.z = 0.305;
+    target_pose2.position.x = -0.313;
+    target_pose2.position.y = -0.231;
+    target_pose2.position.z = 0.035;
 
     // *** Reintroduce Orientation Path Constraints ***
     moveit_msgs::OrientationConstraint ocm;
