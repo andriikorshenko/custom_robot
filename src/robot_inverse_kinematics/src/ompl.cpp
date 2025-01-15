@@ -202,8 +202,8 @@ int main(int argc, char **argv)
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
     // Further lowered velocity and acceleration scaling factors
-    group.setMaxVelocityScalingFactor(1);
-    group.setMaxAccelerationScalingFactor(1);
+    group.setMaxVelocityScalingFactor(0.75);
+    group.setMaxAccelerationScalingFactor(1.0);
 
     group.setPlannerId("PRMstar");
     group.setNumPlanningAttempts(3);
@@ -255,24 +255,24 @@ int main(int argc, char **argv)
     tf2::Quaternion orientation;
     orientation.setRPY(-TAU / 2, 0, 0); // Example orientation (straight)
     target_pose1.orientation = tf2::toMsg(orientation);
-    target_pose1.position.x = 0.301;
-    target_pose1.position.y = -0.303;
-    target_pose1.position.z = 0.121;
+    target_pose1.position.x = 0.276;
+    target_pose1.position.y = -0.197;
+    target_pose1.position.z = 0.250;
 
     target_pose2.orientation = tf2::toMsg(orientation);
-    target_pose2.position.x = -0.313;
-    target_pose2.position.y = -0.231;
-    target_pose2.position.z = 0.035;
+    target_pose2.position.x = -0.239;
+    target_pose2.position.y = 0.112;
+    target_pose2.position.z = 0.125;
 
     // *** Reintroduce Orientation Path Constraints ***
     moveit_msgs::OrientationConstraint ocm;
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.1;
-    ocm.absolute_y_axis_tolerance = 0.1;
-    ocm.absolute_z_axis_tolerance = 0.1;
-    ocm.weight = 0.5;
+    ocm.absolute_x_axis_tolerance = 0.2;
+    ocm.absolute_y_axis_tolerance = 0.2;
+    ocm.absolute_z_axis_tolerance = 0.2;
+    ocm.weight = 0.1;
 
     moveit_msgs::Constraints path_constraints;
     path_constraints.orientation_constraints.push_back(ocm);
