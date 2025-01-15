@@ -1,9 +1,3 @@
-/****************************************************
- * Final Example with Trajectory Caching and Orientation Constraints
- * Ready for Copy & Paste
- ****************************************************/
-
-// Includes
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/DisplayTrajectory.h>
@@ -17,7 +11,7 @@
 #include <cmath>
 #include <functional>
 #include <iostream>
-#include <unordered_map> // Added for unordered_map
+#include <unordered_map> 
 
 // Constants
 const double TAU = 2 * M_PI;
@@ -97,7 +91,7 @@ moveit_msgs::CollisionObject createBox(const std::string &id,
 std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
 {
     std::vector<moveit_msgs::CollisionObject> collision_objects;
-    collision_objects.reserve(5);
+    collision_objects.reserve(6);
 
     // 1) Box under the robot
     {
@@ -142,6 +136,16 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
         pose.position.z = 0.59 / 2.0;
         collision_objects.push_back(createBox("right_wall", pose, {0.02, 0.74, 0.59}));
     }
+    
+    // 6) New box at the arrow's location
+     {
+         geometry_msgs::Pose pose;
+         pose.orientation.w = 1.0;
+         pose.position.x = 0.3; // Replace with the actual X coordinate of the arrow
+         pose.position.y = -0.1; // Replace with the actual Y coordinate of the arrow
+         pose.position.z = 0.075; // Half of the height (15 cm / 2) to center the box on the floor
+         collision_objects.push_back(createBox("small_box", pose, {0.15, 0.15, 0.15})); // 15 cm x 15 cm x 15 cm box
+     }
 
     return collision_objects;
 }
@@ -198,11 +202,12 @@ int main(int argc, char **argv)
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
     // Further lowered velocity and acceleration scaling factors
-    group.setMaxVelocityScalingFactor(1);      // Lowered from 0.75
-    group.setMaxAccelerationScalingFactor(1);  // Lowered from 1.0
+    group.setMaxVelocityScalingFactor(1);
+    group.setMaxAccelerationScalingFactor(1);
 
-    group.setPlannerId("RRTConnect");
-    double planning_time = 5.0; // Increased planning time
+    group.setPlannerId("PRMstar");
+    group.setNumPlanningAttempts(3);
+    double planning_time = 1.0;
     group.setPlanningTime(planning_time);
 
     // If your robot's root link is different, replace "base_link"
@@ -257,16 +262,16 @@ int main(int argc, char **argv)
     target_pose2.orientation = tf2::toMsg(orientation);
     target_pose2.position.x = -0.239;
     target_pose2.position.y = 0.112;
-    target_pose2.position.z = 0.050;
+    target_pose2.position.z = 0.305;
 
     // *** Reintroduce Orientation Path Constraints ***
     moveit_msgs::OrientationConstraint ocm;
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.5; // Reduced tolerance for tighter constraint
-    ocm.absolute_y_axis_tolerance = 0.5;
-    ocm.absolute_z_axis_tolerance = 0.5;
+    ocm.absolute_x_axis_tolerance = 0.1;
+    ocm.absolute_y_axis_tolerance = 0.1;
+    ocm.absolute_z_axis_tolerance = 0.1;
     ocm.weight = 0.5;
 
     moveit_msgs::Constraints path_constraints;
