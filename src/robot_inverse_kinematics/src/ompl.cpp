@@ -88,14 +88,14 @@ std::vector<moveit_msgs::CollisionObject> createCollisionObjects()
     }
     
     // // 6) New box at the arrow's location
-    //  {
-    //      geometry_msgs::Pose pose;
-    //      pose.orientation.w = 1.0;
-    //      pose.position.x = 0.3; // Replace with the actual X coordinate of the arrow
-    //      pose.position.y = -0.1; // Replace with the actual Y coordinate of the arrow
-    //      pose.position.z = 0.075; // Half of the height (15 cm / 2) to center the box on the floor
-    //      collision_objects.push_back(createBox("small_box", pose, {0.15, 0.15, 0.15})); // 15 cm x 15 cm x 15 cm box
-    //  }
+    // {
+    //     geometry_msgs::Pose pose;
+    //     pose.orientation.w = 1.0;
+    //     pose.position.x = 0.3; // Replace with the actual X coordinate of the arrow
+    //     pose.position.y = -0.1; // Replace with the actual Y coordinate of the arrow
+    //     pose.position.z = 0.075; // Half of the height (15 cm / 2) to center the box on the floor
+    //     collision_objects.push_back(createBox("small_box", pose, {0.15, 0.15, 0.15})); // 15 cm x 15 cm x 15 cm box
+    // }
 
     return collision_objects;
 }
@@ -106,7 +106,8 @@ bool performSynchronousPlanning(moveit::planning_interface::MoveGroupInterface &
                                 int max_retries = 10)
 {
     for (int attempt = 1; attempt <= max_retries; ++attempt) {
-        moveit::planning_interface::MoveItErrorCode result = group.plan(plan);
+        // Updated to use moveit::core::MoveItErrorCode
+        moveit::core::MoveItErrorCode result = group.plan(plan);
         if (result == moveit::core::MoveItErrorCode::SUCCESS) {
             ROS_INFO("Planning succeeded on attempt %d.", attempt);
             return true;
