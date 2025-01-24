@@ -215,9 +215,9 @@ int main(int argc, char **argv)
     group.setMaxVelocityScalingFactor(1.0); // Adjust as needed
     group.setMaxAccelerationScalingFactor(1.0); // Adjust as needed
 
-    group.setPlannerId("PRMstar");
-    group.setNumPlanningAttempts(3);
-    double planning_time = 1.0;
+    group.setPlannerId("PersistentPRM");
+    group.setNumPlanningAttempts(5);
+    double planning_time = 10;
     group.setPlanningTime(planning_time);
 
     // If your robot's root link is different, replace "base_link"
@@ -275,10 +275,12 @@ int main(int argc, char **argv)
     ocm.link_name = group.getEndEffectorLink();
     ocm.header.frame_id = "base_link";
     ocm.orientation = target_pose1.orientation;
-    ocm.absolute_x_axis_tolerance = 0.1;
-    ocm.absolute_y_axis_tolerance = 0.1;
-    ocm.absolute_z_axis_tolerance = 0.1;
-    ocm.weight = 0.5;
+    ocm.absolute_x_axis_tolerance = 0.8;
+    ocm.absolute_y_axis_tolerance = 0.8;
+    //ocm.absolute_x_axis_tolerance = M_PI * 2;
+    //ocm.absolute_z_axis_tolerance = 0.1;
+    ocm.absolute_z_axis_tolerance = M_PI * 2;
+    ocm.weight = 0.3;
 
     moveit_msgs::Constraints path_constraints;
     path_constraints.orientation_constraints.push_back(ocm);
@@ -373,7 +375,7 @@ int main(int argc, char **argv)
             }
         }
 
-        if (!plan_found_in_cache) {
+        if (true) {
             // Set the new goal pose
             group.setStartStateToCurrentState(); // Ensure start state is current
             group.setPoseTarget(target_pose);
@@ -386,19 +388,19 @@ int main(int argc, char **argv)
             if (!planning_success) {
                 // Increase planning time
                 planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
-                group.setPlanningTime(planning_time);
+                //group.setPlanningTime(planning_time);
                 consecutive_failures++;
 
                 if (consecutive_failures >= max_failures) {
                     ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
                     planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
+                    //group.setPlanningTime(planning_time);
                     consecutive_failures = 0;
                 }
 
                 group.clearPoseTargets();
                 ros::Duration(0.5).sleep();
-                toggle = !toggle;
+                //toggle = !toggle;
                 continue;
             }
 
@@ -411,19 +413,19 @@ int main(int argc, char **argv)
                 ROS_ERROR("Plan has fewer than 2 trajectory points. Discarding and retrying...");
                 // Increase planning time
                 planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
-                group.setPlanningTime(planning_time);
+                //group.setPlanningTime(planning_time);
                 consecutive_failures++;
 
                 if (consecutive_failures >= max_failures) {
                     ROS_WARN("Max consecutive failures. Reset planning time to 5.0s");
                     planning_time = 5.0;
-                    group.setPlanningTime(planning_time);
+                    //group.setPlanningTime(planning_time);
                     consecutive_failures = 0;
                 }
 
                 group.clearPoseTargets();
                 ros::Duration(0.5).sleep();
-                toggle = !toggle;
+                //toggle = !toggle;
                 continue;
             }
 
@@ -446,20 +448,21 @@ int main(int argc, char **argv)
         moveit::core::MoveItErrorCode exec_result = group.execute(global_plan);
         if (exec_result == moveit::core::MoveItErrorCode::SUCCESS) {
             ROS_INFO("Execution succeeded. Target reached.");
+            toggle = !toggle;
             // Decrease planning time
             planning_time = std::max(min_planning_time, planning_time - planning_time_decrement);
-            group.setPlanningTime(planning_time);
+            //group.setPlanningTime(planning_time);
             consecutive_failures = 0;
         } else {
             ROS_ERROR("Execution failed. Retrying...");
             // Increase planning time
             planning_time = std::min(max_planning_time, planning_time + planning_time_increment);
-            group.setPlanningTime(planning_time);
+            //group.setPlanningTime(planning_time);
         }
 
         group.clearPoseTargets();
         ros::Duration(0.5).sleep();
-        toggle = !toggle;
+        //toggle = !toggle;
     }
 
     // Cleanup

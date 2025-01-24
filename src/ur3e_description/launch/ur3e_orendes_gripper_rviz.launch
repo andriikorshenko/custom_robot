@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Argument to control GUI usage -->
+    <arg name="use_gui" default="true" />
+    
+    <!-- Load the robot description parameter -->
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find ur3e_description)/urdf/ur3e_gripper.xacro" />
+    
+    <!-- Publish robot joint states -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+    
+    <!-- Launch RViz with a specific configuration -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find ur3e_description)/config/config.rviz" />
+
+    <!-- Launch joint state publisher (GUI or non-GUI based on use_gui) -->
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" output="screen" unless="$(arg use_gui)" />
+    <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" output="screen" if="$(arg use_gui)" />
+</launch>
