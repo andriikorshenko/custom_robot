@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <robot name="orendes_85_gripper" xmlns:xacro="http://ros.org/wiki/xacro">
+
     <!-- Include the required gripper Xacro file -->
     <xacro:include filename="$(find orendes_gripper)/urdf/orendes_85_gripper.urdf.xacro" />
     
@@ -7,4 +8,5 @@
     <xacro:orendes_85_gripper prefix="" parent="tool0">
         <origin xyz="0 0 0" rpy="0 0 -1.57">
     </xacro:orendes_85_gripper>
+
 </robot>

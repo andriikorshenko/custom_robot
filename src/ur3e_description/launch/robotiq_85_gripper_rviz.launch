@@ -4,7 +4,7 @@
     <arg name="use_gui" default="true" />
     
     <!-- Load the robot description parameter -->
-    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find ur3e_description)/urdf/ur3e_robotiq_85_gripper.xacro" />
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find ur3e_description)/urdf/robotiq_85_gripper.xacro" />
     
     <!-- Publish robot joint states -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />

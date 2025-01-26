@@ -18,6 +18,6 @@
     Refer to 'inc/ur_macro.xacro' for more information.
   -->
   <xacro:include filename="$(find ur_description)/urdf/inc/ur3e_macro.xacro"/>
-  <xacro:include filename="$(find ur3e_description)/urdf/eef.xacro"/>
+  <xacro:include filename="$(find ur3e_description)/urdf/orendes_85_eef.xacro"/>
   <xacro:ur3e_robot prefix="" />
 </robot>
