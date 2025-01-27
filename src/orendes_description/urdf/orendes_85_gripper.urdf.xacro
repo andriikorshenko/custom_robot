@@ -31,23 +31,27 @@
             </inertial>
         </link>
 
-        <joint name="${prefix}orendes_85_left_finger_tip_joint" type="continuous">
+        <!-- Left Finger Joint -->
+        <joint name="${prefix}orendes_85_left_finger_tip_joint" type="prismatic">
             <parent link="${prefix}orendes_85_base_link"/>
             <child link="${prefix}orendes_85_left_finger_tip_link"/>
-            <axis xyz="0 0 1"/>
+            <axis xyz="1 0 0"/>
             <origin rpy="0.0 0.0 0.0" xyz="-0.0199 0.008 0.045"/>
-            <limit lower="-3.14" upper="3.14" velocity="100.0" effort="0.1"/>
+            <limit lower="0" upper="-0.0036" velocity="0.05" effort="1000"/>
         </joint>
 
-        <joint name="${prefix}orendes_85_right_finger_tip_joint" type="continuous">
+        <!-- Right Finger Joint -->
+        <joint name="${prefix}orendes_85_right_finger_tip_joint" type="prismatic">
             <parent link="${prefix}orendes_85_base_link"/>
             <child link="${prefix}orendes_85_right_finger_tip_link"/>
-            <axis xyz="0 0 1"/>
+            <axis xyz="1 0 0"/>
             <origin rpy="0.0 0.0 0.0" xyz="0.2545451627 -0.03180114443 0.0629"/>
-            <limit lower="-3.14" upper="3.14" velocity="100.0" effort="0.1"/>
+            <limit lower="0" upper="-0.0036" velocity="0.05" effort="1000"/>
+            <!-- Mimic the left finger joint with inverse movement -->
             <mimic joint="${prefix}orendes_85_left_finger_tip_joint" multiplier="-1"/>
         </joint>
 
+        <!-- Left Finger Link -->
         <link name="${prefix}orendes_85_left_finger_tip_link">
             <visual>
                 <geometry>
@@ -62,12 +66,13 @@
             <inertial>
                 <mass value="0.018491" />
                 <origin xyz="0.0 0.0 0.0" />
-                <inertia ixx="0.000009" ixy="-0.000001" ixz="0.000000"
-                         iyx="-0.000001" iyy="0.000001" iyz="0.000000"
-                         izx="0.000000" izy="0.000000" izz="0.000010" />
+                <inertia ixx="0.000002" ixy="0.000000" ixz="0.000000"
+                         iyx="0.000000" iyy="0.000005" iyz="0.000000"
+                         izx="0.000000" izy="0.000000" izz="0.000006" />
             </inertial>
         </link> 
         
+        <!-- Right Finger Link -->
         <link name="${prefix}orendes_85_right_finger_tip_link">
             <visual>
                 <geometry>
@@ -82,9 +87,9 @@
             <inertial>
                 <mass value="0.018491" />
                 <origin xyz="0.0 0.0 0.0" />
-                <inertia ixx="0.000009" ixy="-0.000001" ixz="0.000000"
-                         iyx="-0.000001" iyy="0.000001" iyz="0.000000"
-                         izx="0.000000" izy="0.000000" izz="0.000010" />
+                <inertia ixx="0.000002" ixy="0.000000" ixz="0.000000"
+                         iyx="0.000000" iyy="0.000005" iyz="0.000000"
+                         izx="0.000000" izy="0.000000" izz="0.000006" />
             </inertial>
         </link>
     </xacro:macro>
