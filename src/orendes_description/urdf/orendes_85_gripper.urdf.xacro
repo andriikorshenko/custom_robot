@@ -31,11 +31,11 @@
             </inertial>
         </link>
 
-        <joint name="${prefix}orendes_85_left_finger_tip_joint" type="revolute">
+        <joint name="${prefix}orendes_85_left_finger_tip_joint" type="continuous">
             <parent link="${prefix}orendes_85_base_link"/>
             <child link="${prefix}orendes_85_left_finger_tip_link"/>
             <axis xyz="0 0 1"/>
-            <origin rpy="0.0001 0.0 0.0" xyz="-0.0199 0.008 0.045"/>
+            <origin rpy="0.0 0.0 0.0" xyz="-0.0199 0.008 0.045"/>
             <limit lower="-3.14" upper="3.14" velocity="100.0" effort="0.1"/>
         </joint>
 
@@ -45,7 +45,7 @@
             <axis xyz="0 0 1"/>
             <origin rpy="0.0 0.0 0.0" xyz="0.2545451627 -0.03180114443 0.0629"/>
             <limit lower="-3.14" upper="3.14" velocity="100.0" effort="0.1"/>
-            <mimic joint="${prefix}orendes_85_left_finger_tip_joint"/>
+            <mimic joint="${prefix}orendes_85_left_finger_tip_joint" multiplier="-1"/>
         </joint>
 
         <link name="${prefix}orendes_85_left_finger_tip_link">
