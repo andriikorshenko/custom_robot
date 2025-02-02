@@ -1,3 +1,4 @@
+<!-- Inetia is calculated with: https://en.wikipedia.org/wiki/List_of_moments_of_inertia -->
 <?xml version = "1.0"?>
 <robot xmlns:xacro="http://www.ros.org.wiki.xacro">
     <xacro:include filename="$(find custom_robot_description)/urdf/link_joint.xacro"/>
@@ -5,10 +6,17 @@
     <xacro:macro name="custom_gripper" params="parent origin_xyz">
         <!-- gripper_connector -->
         <xacro:cobot_link_cylinder name="gripper_connector" 
-            origin_xyz="0 0 0.015" 
-            origin_rpy="0 0 0" 
+            origin_xyz="0.0 0.0 0.015" 
+            origin_rpy="0.0 0.0 0.0" 
             radius="0.04" 
-            length="0.03"/>
+            length="0.03"
+            mass="0.5"
+            i_xx="0.002375" 
+            i_xy="0.0" 
+            i_xz="0.0"  
+            i_yy="0.002375" 
+            i_yz="0.0" 
+            i_zz="0.00006666666667"/>
         <!-- connect gripper_connector to the parent -->
         <joint name="{parent}__gripper_connector" type="fixed">
             <parent link="${parent}"/>
@@ -17,9 +25,16 @@
         </joint>
         <!-- finger_support -->
         <xacro:cobot_link_box name="finger_support" 
-            origin_xyz="0 0.005 0.005" 
-            origin_rpy="0 0 0" 
-            size="0.120 0.01 0.01"/>
+            origin_xyz="0.0 0.005 0.005" 
+            origin_rpy="0.0 0.0 0.0" 
+            size="0.120 0.01 0.01"
+            mass="0.25"
+            i_xx="0.0003"
+            i_xy="0.0" 
+            i_xz="0.0"  
+            i_yy="0.0" 
+            i_yz="0.0" 
+            i_zz="0.0003"/>
         <!-- connect gripper_connector to finger_support -->
         <joint name="finger_support__gripper_connector" type="fixed">
             <parent link="gripper_connector"/>
@@ -30,11 +45,25 @@
         <xacro:cobot_link_box name="finger_right" 
             origin_xyz="0 0 0.04" 
             origin_rpy="0 0 0" 
-            size="0.01 0.01 0.08"/>
+            size="0.01 0.01 0.08"
+            mass="0.2"
+            i_xx="0.00042667"
+            i_xy="0.0" 
+            i_xz="0.0"  
+            i_yy="0.0" 
+            i_yz="0.0" 
+            i_zz="0.00042667"/>
         <xacro:cobot_link_box name="finger_left" 
             origin_xyz="0 0 0.04" 
             origin_rpy="0 0 0" 
-            size="0.01 0.01 0.08"/>
+            size="0.01 0.01 0.08"
+            mass="0.2"
+            i_xx="0.00042667"
+            i_xy="0.0" 
+            i_xz="0.0"  
+            i_yy="0.0" 
+            i_yz="0.0" 
+            i_zz="0.00042667"/>
         <!-- connect finger_right and finger_left to finger_support -->
         <joint name="finger_right_joint" type="prismatic">
             <parent link="finger_support"/>
